@@ -244,4 +244,5 @@ diffusion-mnist/
 
 - Ho, Jain, Abbeel (2020), *Denoising Diffusion Probabilistic Models*
 - Song, Meng, Ermon (2021), *Denoising Diffusion Implicit Models*
-- Ho and
+- Ho and Salimans (2022), Classifier-Free Diffusion Guidance
+- Nichol and Dhariwal (2021), Improved Denoising Diffusion Probabilistic Models
