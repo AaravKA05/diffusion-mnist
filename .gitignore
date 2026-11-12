@@ -4,6 +4,5 @@ data/
 __pycache__/
 *.pt
 *.pth
-checkpoints/
 .ipynb_checkpoints/
 .DS_Store
