@@ -36,7 +36,7 @@ I built this to understand the core idea behind Stable Diffusion and Midjourney,
 
 ## How diffusion works
 
-A diffusion model learns to undo noise. In the forward process I take a real image and add a little Gaussian noise at each of 400 steps until only static is left. This needs no learning, and a closed-form formula lets me jump to any step `t` in one operation, which makes training cheap. A U-Net is then trained to predict the noise that was added to an image, and it is told how noisy the input is through a time embedding. To generate a new image, I start from pure random noise and repeatedly remove the predicted noise, step by step, until a digit appears.
+A diffusion model learns to generate images by reversing the process of adding noise. During training, Gaussian noise is gradually added to real images over 400 steps until they become pure noise. A mathematical formula allows us to directly generate any noise level, making training more efficient. A U-Net is trained to predict and remove this noise, using time embeddings to understand each stage. During generation, the model starts with random noise and progressively removes it, transforming static into a completely new image.
 
 The key formula (forward process, jump straight to step `t`):
 
@@ -184,24 +184,30 @@ A small CNN classifier (**98.1%** test accuracy on real MNIST) scores the genera
 | Samples with classifier confidence > 0.9 | 78% |
 | Predicted class counts (digits 0 to 9) | 136, 46, 124, 135, 85, 124, 82, 77, 123, 68 |
 
-**Conditional model** (1000 samples, 100 per label, DDIM 50 steps)
+**Conditional model** (1000 samples, 100 per label, DDIM 50 steps, same starting noise for every `w`)
 
 | Guidance `w` | Label accuracy |
 |---|---|
-| 0.0 | 9.9% |
-| **1.0** | **90.8%** |
-| 1.5 | 82.1% |
-| 2.0 | 51.3% |
-| 3.0 | 22.5% |
-| 5.0 | 7.6% (from an earlier run) |
+| 0.0 | 9.3% |
+| 0.5 | 44.0% |
+| 0.8 | 77.9% |
+| 1.0 | 89.5% |
+| 1.1 | 92.5% |
+| **1.2** | **93.7%** |
+| 1.3 | 91.2% |
+| 1.5 | 80.5% |
+| 2.0 | 50.7% |
+
+<p align="center">
+  <img src="results/w_sweep.png" width="420" alt="Label accuracy vs guidance strength">
+</p>
 
 **Findings**
 
 - **Class balance.** The 10 classes are roughly balanced but not perfectly: digit 1 appears only 46 times out of 1000. I did not check whether this comes from the generator or from classifier bias.
 - **`w = 0` ignores the label**, so accuracy is chance level (about 10%), as expected.
-- **Guidance did not help in this setup.** Accuracy was best at `w = 1.0` and fell as `w` grew, and the digits visibly break down for `w >= 2`. My guess is that the unconditional prediction is weak (small model, 30 epochs, only 10% unconditional training) and guidance amplifies its error. I have not tested this.
-
----
+- **Guidance helps a little, but only in a narrow range.** Accuracy peaks at `w = 1.2` (93.7% vs 89.5% at `w = 1.0`) and then falls fast; the digits visibly break down for `w >= 2`. This is a single seed on 1000 samples, so the gain of about 4 points is modest and I did not measure its variance.
+- **A wrong first conclusion.** My first sweep only tried `w = 1, 3, 5`, and I wrongly concluded that guidance does not help. A finer sweep around `1.0` to `1.5` showed the real peak.
 
 ## What went wrong
 
@@ -212,7 +218,7 @@ A small CNN classifier (**98.1%** test accuracy on real MNIST) scores the genera
 | Nested project folder | The venv ended up one level above the project files | Moved the files up one level |
 | Wrong training command | Ran `python train.py` without `--cond` by mistake | Stopped with Ctrl+C and checked `loss_history.json` (30 entries) to confirm old checkpoints were intact |
 | Empty folder missing from the repo | `.gitignore` ignored `checkpoints/`, so its `.gitkeep` was never committed and training would fail on a fresh clone | Ignore only `*.pt` |
-| Wrong expectation about guidance | I expected higher `w` to improve accuracy, but it made things worse | See [Evaluation](#7-evaluation) |
+| Wrong conclusion about guidance | My first sweep used `w = 1, 3, 5` only and I concluded guidance hurts | A fine sweep (`w = 0 to 2`) showed a peak at `w = 1.2`; always sweep a range, not three points |(#7-evaluation) |
 | Evaluation numbers changed between runs | The first `evaluate.py` run trained the classifier and used up random numbers, so the second run (which loaded it) sampled differently | The tables use the latest run |
 
 ---
@@ -246,3 +252,4 @@ diffusion-mnist/
 - Song, Meng, Ermon (2021), *Denoising Diffusion Implicit Models*
 - Ho and Salimans (2022), Classifier-Free Diffusion Guidance
 - Nichol and Dhariwal (2021), Improved Denoising Diffusion Probabilistic Models
+
