@@ -173,6 +173,12 @@ Each row is one digit (0 to 9). Samples use DDIM with 50 steps.
   </tr>
 </table>
 
+**Denoising animation** (conditional model, DDIM, `w = 1.2`)
+
+<p align="center">
+  <img src="results/denoising.gif" width="520" alt="Static turning into digits">
+</p>
+
 ### 7. Evaluation
 
 A small CNN classifier (**98.1%** test accuracy on real MNIST) scores the generated digits.
