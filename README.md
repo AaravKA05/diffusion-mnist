@@ -224,7 +224,7 @@ A small CNN classifier (**98.1%** test accuracy on real MNIST) scores the genera
 | Nested project folder | The venv ended up one level above the project files | Moved the files up one level |
 | Wrong training command | Ran `python train.py` without `--cond` by mistake | Stopped with Ctrl+C and checked `loss_history.json` (30 entries) to confirm old checkpoints were intact |
 | Empty folder missing from the repo | `.gitignore` ignored `checkpoints/`, so its `.gitkeep` was never committed and training would fail on a fresh clone | Ignore only `*.pt` |
-| Wrong conclusion about guidance | My first sweep used `w = 1, 3, 5` only and I concluded guidance hurts | A fine sweep (`w = 0 to 2`) showed a peak at `w = 1.2`; always sweep a range, not three points |(#7-evaluation) |
+| Wrong conclusion about guidance | My first sweep used `w = 1, 3, 5` only and I concluded guidance hurts | A fine sweep (`w = 0 to 2`) showed a peak at `w = 1.2`; always sweep a range, not three points |
 | Evaluation numbers changed between runs | The first `evaluate.py` run trained the classifier and used up random numbers, so the second run (which loaded it) sampled differently | The tables use the latest run |
 
 ---
