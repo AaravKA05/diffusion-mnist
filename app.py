@@ -29,7 +29,7 @@ demo = gr.Interface(
     inputs=[
         gr.Slider(0, 9, value=7, step=1, label="Digit"),
         gr.Slider(1, 16, value=8, step=1, label="How many samples"),
-        gr.Slider(1.0, 2.0, value=1.0, step=0.1, label="Guidance w"),
+        gr.Slider(1.0, 2.0, value=1.2, step=0.1, label="Guidance w"),
         gr.Slider(5, 100, value=20, step=5, label="DDIM steps"),
         gr.Number(value=0, label="Seed"),
     ],
