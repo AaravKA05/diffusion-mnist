@@ -110,6 +110,9 @@ pip install -r requirements.txt
 uvicorn server:app --port 8000
 # open http://localhost:8000
 ```
+<p align="center">
+  <img src="results/web_demo.png" width="640" alt="Web demo">
+</p>
 
 Needs `checkpoints/cond_ema.pt` (train it first, weights are not in the repo).
 
