@@ -1,12 +1,13 @@
 """Put DDPM and DDIM sample grids side by side."""
+
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 
 files = [
-    ("results/samples_ema.png", "DDPM, 400 steps (9.2 s)"),
-    ("results/samples_ema_ddim50.png", "DDIM, 50 steps (1.2 s)"),
-    ("results/samples_ema_ddim20.png", "DDIM, 20 steps (0.5 s)"),
-    ("results/samples_ema_ddim10.png", "DDIM, 10 steps (0.3 s)"),
+    ("results/samples_ema.png", "DDPM, 400 steps"),
+    ("results/samples_ema_ddim50.png", "DDIM, 50 steps"),
+    ("results/samples_ema_ddim20.png", "DDIM, 20 steps"),
+    ("results/samples_ema_ddim10.png", "DDIM, 10 steps"),
 ]
 
 fig, axes = plt.subplots(1, 4, figsize=(20, 5.5))
