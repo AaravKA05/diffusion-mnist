@@ -171,6 +171,7 @@ Same starting noise, EMA decay `0.995`. On MNIST the difference is small.
 The first DDPM run took 6.8 s because it includes GPU warm-up, so 5.6 s (second run) is used as the baseline. The speedup on GPU is smaller than on CPU; I did not measure why.
 
 DDIM is deterministic, while DDPM adds fresh noise at every step, so its grid differs.
+At 32x32 the DDIM 10, 20 and 50 step grids show nearly the same digits in the same positions, with small differences in fine detail (visual impression, not measured).
 
 <p align="center">
   <img src="results/ddim_comparison.png" alt="DDIM comparison">
