@@ -94,6 +94,7 @@ Tested with Python 3.13 and PyTorch 2.15 (CPU build).
 | `python evaluate.py` | Classifier-based evaluation |
 | `python sweep_w.py` | Label accuracy for several guidance strengths |
 | `python make_gif.py` | Denoising GIF (two rows of digits 0 to 9) |
+| `python check_clf.py` | Test accuracy of the saved classifier on real MNIST (98.52% at 32x32) |
 | `python app.py` | Gradio live demo |
 | `uvicorn server:app --port 8000` | Full-stack demo (FastAPI backend + web page at http://localhost:8000) |
 
@@ -310,10 +311,13 @@ diffusion-mnist/
 ├── compare.py          # EMA vs no-EMA figure
 ├── compare_ddim.py     # DDPM vs DDIM figure
 ├── check_setup.py      # environment check
+├── check_clf.py        # test accuracy of the saved classifier on real MNIST
 ├── requirements.txt
 ├── notebooks/
 ├── results/            # figures and loss histories
 └── checkpoints/        # saved weights (git-ignored)
+```
+
 ---
 
 ## References
