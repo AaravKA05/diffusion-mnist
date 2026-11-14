@@ -114,11 +114,14 @@ pip install -r requirements.txt
 uvicorn server:app --port 8000
 # open http://localhost:8000
 ```
+
 <p align="center">
   <img src="results/web_demo.png" width="640" alt="Web demo">
 </p>
 
 Needs `checkpoints/cond_ema.pt` (train it first, weights are not in the repo).
+
+---
 
 ## Results
 
@@ -127,7 +130,8 @@ All numbers below are for **32x32 images, `BASE_CH = 64`, 30 epochs, trained on 
 ### 1. Data and forward process
 
 Images are normalized to `[-1, 1]` so they live on the same scale as the unit-variance noise. With `T = 400` and a linear schedule from `1e-4` to `0.02`, `alpha_bar` goes from `0.9999` to `0.0175`, so the last step is almost pure static.
-“Training set counts per digit: [5923, 6742, 5958, 6131, 5842, 5421, 5918, 6265, 5851, 5949]"
+
+Training set counts per digit (0 to 9): 5923, 6742, 5958, 6131, 5842, 5421, 5918, 6265, 5851, 5949.
 
 <p align="center">
   <img src="results/step2_forward.png" alt="Forward process">
@@ -179,6 +183,7 @@ Same starting noise, EMA decay `0.995`. On MNIST the difference is small.
 The first DDPM run took 6.8 s because it includes GPU warm-up, so 5.6 s (second run) is used as the baseline. The speedup on GPU is smaller than on CPU; I did not measure why.
 
 DDIM is deterministic, while DDPM adds fresh noise at every step, so its grid differs.
+
 At 32x32 the DDIM 10, 20 and 50 step grids show nearly the same digits in the same positions, with small differences in fine detail (visual impression, not measured).
 
 <p align="center">
@@ -248,13 +253,13 @@ A small CNN classifier (**98.52%** test accuracy on real 32x32 MNIST) scores the
 **Findings**
 
 - **`w = 0` ignores the label**, so accuracy is at chance level (about 10%), as expected.
-- **Guidance helps a little, and only in a narrow range.** In the sweep, accuracy peaks around `w = 1.1` to `1.2` (about 90%) versus 86.8% at `w = 1.0`. Two runs of the same setup differed by about 0.5 points, but a separate run with different samples (`diagnose.py`, 50 per label) gave 92.8% at `w = 1.2`, so run-to-run differences with different draws are a few points. The gain from guidance is therefore small and not clearly separated from noise. Above `w = 1.5` accuracy falls fast.
+- **Guidance helps a little, and only in a narrow range.** In the sweep, accuracy peaks around `w = 1.1` to `1.2` (about 90%) versus 86.8% at `w = 1.0`. Two earlier runs (`sweep_w.py` and `evaluate.py`) differed by about 0.5 points at `w = 1.0` (86.8% vs 86.3%), but a separate run with different samples (`diagnose.py`, 50 per label) gave 92.8% at `w = 1.2`, so run-to-run differences with different draws are a few points. The gain from guidance is therefore small and not clearly separated from noise. Above `w = 1.5` accuracy falls fast.
 - **A wrong first conclusion.** My first sweep only tried `w = 1, 3, 5`, and I wrongly concluded that guidance does not help. A finer sweep showed the real peak.
 - **Guidance numbers are for DDIM 50 steps.** I made no accuracy measurement for other step counts.
 
 ### 8. Live demo speed (laptop CPU, 32x32)
 
-Measured on the laptop CPU, approximate (stopwatch in the Gradio demo, and the "Done in" time reported by the FastAPI server). Digit 7, 8 samples, DDIM 20 steps:
+Measured on the laptop CPU, approximate: the "Done in" time reported by the FastAPI server for digit 7, DDIM 20 steps, seed 0. The `w = 1.2` run used 8 samples; I did not record the sample count for the other two runs.
 
 | Guidance `w` | FastAPI server time |
 |---|---|
@@ -262,17 +267,15 @@ Measured on the laptop CPU, approximate (stopwatch in the Gradio demo, and the "
 | 1.2 | 4.6 s |
 | 2 | 4.32 s |
 
-Gradio gave about 4.9 s for 20 steps and about 12 s for 50 steps. For `w` other than 1.0 the model runs twice per step (conditional and unconditional), so `w` barely changes the time.
+A stopwatch in the Gradio demo gave about 4.9 s for 20 steps and about 12 s for 50 steps (the number of images in that run was not recorded). For `w` other than 1.0 the model runs twice per step (conditional and unconditional), so `w` barely changes the time.
 
 ### 9. Diagnosis of two open questions (`diagnose.py`)
 
 `diagnose.py` (laptop CPU, about 15 to 18 minutes, 500 unconditional samples and 50 samples per label, DDIM 50 steps, seed 0) looks at the two open questions. These are observations from one run, not proven causes.
 
-**Digit 1 is rare in unconditional samples.** Only 14 of 500 samples (2.8%) were classified as 1 (earlier run: 32 of 1000). The classifier does not seem to be the cause: it is 99.74% accurate on real 1s, reads generated 1s with mean confidence 0.997, and no sample had p(1) > 0.2 while being assigned to another class. The conditional model can make 1s when asked (42 of 50 recognised at `w = 1.2`, the lowest per-digit accuracy). So the shortfall seems to come from the unconditional generator; I do not know why. Digits 0, 2 and 3 were over-represented and 4 under-represented in both runs.
-The training set does not explain it either: digit 1 is the most frequent class in MNIST (6742 of 60,000 training images, versus 5421 to 6265 for the other digits).
+**Digit 1 is rare in unconditional samples.** Only 14 of 500 samples (2.8%) were classified as 1 (earlier run: 32 of 1000). The classifier does not seem to be the cause: it is 99.74% accurate on real 1s, reads generated 1s with mean confidence 0.997, and no sample had p(1) > 0.2 while being assigned to another class. The conditional model can make 1s when asked (42 of 50 recognised at `w = 1.2`, the lowest per-digit accuracy). So the shortfall seems to come from the unconditional generator; I do not know why. Digits 0, 2 and 3 appeared most often and digits 1, 4 and 6 least often in both runs. The training set does not explain it either: digit 1 is the most frequent class in MNIST (6742 of 60,000 training images, versus 5421 to 6265 for the other digits).
 
-**`w = 3.0` is below chance.** 17 of 500 samples (3.4%) matched the requested label. No sample was classified as 1 for any label, and the most predicted classes were 2 (118) and 0 (92). The classifier stays fairly confident (mean 0.832) and pixels are not saturated, so the images are not simply blown out. I did not find out why guidance this strong moves samples away from the requested digit.
-Visually, the `w = 3.0` samples are distorted blobs and tangled strokes rather than recognisable digits (see the `w = 3.0` grid above).
+**`w = 3.0` is below chance.** 17 of 500 samples (3.4%) matched the requested label. No sample was classified as 1 for any label, and the most predicted classes were 2 (118) and 0 (92). The classifier stays fairly confident (mean 0.832) and pixels are not saturated, so the images are not simply blown out. Visually, the `w = 3.0` samples are distorted blobs and tangled strokes rather than recognisable digits (see the `w = 3.0` grid above). I did not find out why guidance this strong moves samples away from the requested digit.
 
 ### Side note: earlier 16x16 runs on laptop CPU
 
