@@ -127,6 +127,7 @@ All numbers below are for **32x32 images, `BASE_CH = 64`, 30 epochs, trained on 
 ### 1. Data and forward process
 
 Images are normalized to `[-1, 1]` so they live on the same scale as the unit-variance noise. With `T = 400` and a linear schedule from `1e-4` to `0.02`, `alpha_bar` goes from `0.9999` to `0.0175`, so the last step is almost pure static.
+“Training set counts per digit: [5923, 6742, 5958, 6131, 5842, 5421, 5918, 6265, 5851, 5949]"
 
 <p align="center">
   <img src="results/step2_forward.png" alt="Forward process">
