@@ -20,6 +20,7 @@ I built this to understand the core idea behind Stable Diffusion and Midjourney,
 - Class-conditional generation with classifier-free guidance
 - Classifier-based evaluation of generated digits
 - Denoising GIF and a Gradio live demo
+- Full-stack demo: FastAPI backend with a web interface
 
 **Final results use 32x32 images, trained on a free Colab T4 GPU.** Earlier 16x16 runs on a laptop CPU are kept as a side note at the end of the Results section.
 
@@ -30,10 +31,11 @@ I built this to understand the core idea behind Stable Diffusion and Midjourney,
 1. [How diffusion works](#how-diffusion-works)
 2. [Setup](#setup)
 3. [Usage](#usage)
-4. [Results](#results)
-5. [What went wrong](#what-went-wrong)
-6. [Project structure](#project-structure)
-7. [References](#references)
+4. [Full-stack demo](#full-stack-demo)
+5. [Results](#results)
+6. [What went wrong](#what-went-wrong)
+7. [Project structure](#project-structure)
+8. [References](#references)
 
 ---
 
@@ -95,6 +97,7 @@ Tested with Python 3.13 and PyTorch 2.15 (CPU build).
 | `python sweep_w.py` | Label accuracy for several guidance strengths |
 | `python make_gif.py` | Denoising GIF (two rows of digits 0 to 9) |
 | `python check_clf.py` | Test accuracy of the saved classifier on real MNIST (98.52% at 32x32) |
+| `python diagnose.py` | Per-digit diagnosis of unconditional and guided samples (about 15 to 18 min on a laptop CPU) |
 | `python app.py` | Gradio live demo |
 | `uvicorn server:app --port 8000` | Full-stack demo (FastAPI backend + web page at http://localhost:8000) |
 
@@ -244,9 +247,7 @@ A small CNN classifier (**98.52%** test accuracy on real 32x32 MNIST) scores the
 **Findings**
 
 - **`w = 0` ignores the label**, so accuracy is at chance level (about 10%), as expected.
-- **Guidance helps a little, and only in a narrow range.** Accuracy peaks around `w = 1.1` to `1.2` (about 90%) versus 86.8% at `w = 1.0`, a gain of roughly 3 to 4 points. Run-to-run noise is about 0.5 points, so the difference between 1.1 and 1.2 is within noise. Above `w = 1.5` accuracy falls fast.
-- **Digit 1 is under-represented** in unconditional samples (32 out of 1000). I did not check whether this comes from the generator or from classifier bias.
-- **At `w = 3.0` accuracy is 2.3%, below the 10% chance level.** I did not investigate the cause.
+- **Guidance helps a little, and only in a narrow range.** In the sweep, accuracy peaks around `w = 1.1` to `1.2` (about 90%) versus 86.8% at `w = 1.0`. Two runs of the same setup differed by about 0.5 points, but a separate run with different samples (`diagnose.py`, 50 per label) gave 92.8% at `w = 1.2`, so run-to-run differences with different draws are a few points. The gain from guidance is therefore small and not clearly separated from noise. Above `w = 1.5` accuracy falls fast.
 - **A wrong first conclusion.** My first sweep only tried `w = 1, 3, 5`, and I wrongly concluded that guidance does not help. A finer sweep showed the real peak.
 - **Guidance numbers are for DDIM 50 steps.** I made no accuracy measurement for other step counts.
 
@@ -261,6 +262,14 @@ Measured on the laptop CPU, approximate (stopwatch in the Gradio demo, and the "
 | 2 | 4.32 s |
 
 Gradio gave about 4.9 s for 20 steps and about 12 s for 50 steps. For `w` other than 1.0 the model runs twice per step (conditional and unconditional), so `w` barely changes the time.
+
+### 9. Diagnosis of two open questions (`diagnose.py`)
+
+`diagnose.py` (laptop CPU, about 15 to 18 minutes, 500 unconditional samples and 50 samples per label, DDIM 50 steps, seed 0) looks at the two open questions. These are observations from one run, not proven causes.
+
+**Digit 1 is rare in unconditional samples.** Only 14 of 500 samples (2.8%) were classified as 1 (earlier run: 32 of 1000). The classifier does not seem to be the cause: it is 99.74% accurate on real 1s, reads generated 1s with mean confidence 0.997, and no sample had p(1) > 0.2 while being assigned to another class. The conditional model can make 1s when asked (42 of 50 recognised at `w = 1.2`, the lowest per-digit accuracy). So the shortfall seems to come from the unconditional generator; I do not know why. Digits 0, 2 and 3 were over-represented and 4 under-represented in both runs.
+
+**`w = 3.0` is below chance.** 17 of 500 samples (3.4%) matched the requested label. No sample was classified as 1 for any label, and the most predicted classes were 2 (118) and 0 (92). The classifier stays fairly confident (mean 0.832) and pixels are not saturated, so the images are not simply blown out. I did not find out why guidance this strong moves samples away from the requested digit.
 
 ### Side note: earlier 16x16 runs on laptop CPU
 
@@ -288,6 +297,10 @@ Before moving to Colab I trained 16x16 models (`BASE_CH = 32`) on a laptop CPU.
 | Colab runtime reset | The reset wiped `/content` (cloned repo and results). Weights survived only because `checkpoints/` was symlinked to Google Drive | Keep weights on Drive and back up `results/` after each step |
 | Stale files mixed into results | Copying `results/` to Drive mixed old 16x16 files from `git clone` with new 32x32 files | Delete stale files first, then check sizes and timestamps (the old GIF was exactly 3,409,664 bytes) |
 | Colab GPU quota | Free GPU access can run out ("usage limits") | Finish GPU work early and keep backups of weights and figures |
+| Wrong virtual environment | VS Code auto-created a `.venv` without gradio, so `pip show gradio` said "not found" | Check the prompt shows `(venv)`, select the right interpreter |
+| `requirements.txt` problems | It was saved as UTF-16 by a PowerShell redirect and did not list gradio although `app.py` imports it | Save as UTF-8, check every import against the file |
+| Broken README layout | A missing closing code fence made the rest of the page appear inside a grey box on GitHub | Preview the README on GitHub after every structural edit |
+| Screenshot saved in the wrong place | Saving from the Snipping Tool created `results/results/` and a file named `resultsweb_demo.png.png` | Type the full path in the save dialog, check names with `dir` |
 
 ---
 
@@ -312,6 +325,7 @@ diffusion-mnist/
 ├── compare_ddim.py     # DDPM vs DDIM figure
 ├── check_setup.py      # environment check
 ├── check_clf.py        # test accuracy of the saved classifier on real MNIST
+├── diagnose.py         # per-digit diagnosis of unconditional and guided samples
 ├── requirements.txt
 ├── notebooks/
 ├── results/            # figures and loss histories
