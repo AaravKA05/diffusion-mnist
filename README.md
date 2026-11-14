@@ -301,6 +301,8 @@ diffusion-mnist/
 ├── sweep_w.py          # guidance sweep
 ├── make_gif.py         # denoising GIF
 ├── app.py              # Gradio demo
+├── server.py           # FastAPI backend (full-stack demo)
+├── static/             # web interface (index.html)
 ├── compare.py          # EMA vs no-EMA figure
 ├── compare_ddim.py     # DDPM vs DDIM figure
 ├── check_setup.py      # environment check
@@ -308,10 +310,6 @@ diffusion-mnist/
 ├── notebooks/
 ├── results/            # figures and loss histories
 └── checkpoints/        # saved weights (git-ignored)
-├── server.py           # FastAPI backend
-├── static/             # web interface (index.html)
-```
-
 ---
 
 ## References
