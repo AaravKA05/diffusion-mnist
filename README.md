@@ -95,10 +95,23 @@ Tested with Python 3.13 and PyTorch 2.15 (CPU build).
 | `python sweep_w.py` | Label accuracy for several guidance strengths |
 | `python make_gif.py` | Denoising GIF (two rows of digits 0 to 9) |
 | `python app.py` | Gradio live demo |
+| `uvicorn server:app --port 8000` | Full-stack demo (FastAPI backend + web page at http://localhost:8000) |
 
 All settings (image size, `T`, learning rate, epochs, EMA decay) live in `config.py`.
 
 ---
+
+## Full-stack demo
+
+A FastAPI backend loads the conditional model once and serves `POST /api/generate` (digit, count, guidance `w`, DDIM steps, seed). A single-page web interface in `static/index.html` calls it and shows the generated digits, the denoising GIF and the guidance sweep plot. Auto-generated API docs are at `/docs`.
+
+```bash
+pip install -r requirements.txt
+uvicorn server:app --port 8000
+# open http://localhost:8000
+```
+
+Needs `checkpoints/cond_ema.pt` (train it first, weights are not in the repo).
 
 ## Results
 
@@ -234,7 +247,15 @@ A small CNN classifier (**98.52%** test accuracy on real 32x32 MNIST) scores the
 
 ### 8. Live demo speed (laptop CPU, 32x32)
 
-Measured with a stopwatch in the Gradio demo, 4 images, so these are approximate and include Gradio overhead: DDIM 20 steps about 4.9 s, DDIM 50 steps about 12 s.
+Measured on the laptop CPU, approximate (stopwatch in the Gradio demo, and the "Done in" time reported by the FastAPI server). Digit 7, 8 samples, DDIM 20 steps:
+
+| Guidance `w` | FastAPI server time |
+|---|---|
+| 0 | 4.2 s |
+| 1.2 | 4.6 s |
+| 2 | 4.32 s |
+
+Gradio gave about 4.9 s for 20 steps and about 12 s for 50 steps. For `w` other than 1.0 the model runs twice per step (conditional and unconditional), so `w` barely changes the time.
 
 ### Side note: earlier 16x16 runs on laptop CPU
 
@@ -287,6 +308,8 @@ diffusion-mnist/
 ├── notebooks/
 ├── results/            # figures and loss histories
 └── checkpoints/        # saved weights (git-ignored)
+├── server.py           # FastAPI backend
+├── static/             # web interface (index.html)
 ```
 
 ---
