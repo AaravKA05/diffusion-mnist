@@ -1,5 +1,7 @@
 """Live demo: pick a digit, get new handwritten samples."""
 
+import sys
+
 import gradio as gr
 import torch
 from PIL import Image
@@ -39,4 +41,4 @@ demo = gr.Interface(
 )
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(share="--share" in sys.argv)
