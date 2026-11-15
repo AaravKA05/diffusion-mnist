@@ -1,0 +1,9 @@
+{
+  "n_generated": 100,
+  "w": 1.2,
+  "generated_median_dist": 10.587,
+  "test_median_dist": 7.74,
+  "generated_min_dist": 3.095,
+  "test_min_dist": 1.929,
+  "generated_closer_than_every_test_image": 0
+}
