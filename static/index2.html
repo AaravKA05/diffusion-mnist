@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Diffusion MNIST</title>
+    <style>
+        :root {
+            --bg: #0f1115;
+            --card: #181b22;
+            --line: #2a2f3a;
+            --text: #e8eaf0;
+            --muted: #8b93a7;
+            --accent: #6c8cff;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        }
+
+        .wrap {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 32px 20px 60px;
+        }
+
+        h1 {
+            margin: 0 0 6px;
+            font-size: 28px;
+        }
+
+        .sub {
+            color: var(--muted);
+            margin: 0 0 28px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card h2 {
+            margin: 0 0 14px;
+            font-size: 16px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .06em;
+        }
+
+        .digits {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 8px;
+        }
+
+        .digits button {
+            padding: 12px 0;
+            font-size: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            background: #20242d;
+            color: var(--text);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+        }
+
+        .digits button.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 18px;
+            margin-top: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            color: var(--muted);
+            margin-bottom: 6px;
+        }
+
+        label b {
+            color: var(--text);
+            float: right;
+        }
+
+        input[type=range] {
+            width: 100%;
+            accent-color: var(--accent);
+        }
+
+        input[type=number] {
+            width: 100%;
+            padding: 8px;
+            background: #20242d;
+            color: var(--text);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+        }
+
+        .row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .row button {
+            white-space: nowrap;
+        }
+
+        button.go {
+            margin-top: 22px;
+            width: 100%;
+            padding: 14px;
+            font-size: 16px;
+            font-weight: 600;
+            background: var(--accent);
+            color: #fff;
+            border: 0;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+
+        button.go:disabled {
+            opacity: .6;
+            cursor: wait;
+        }
+
+        button.small {
+            padding: 8px 12px;
+            background: #20242d;
+            color: var(--text);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .status {
+            margin-top: 14px;
+            color: var(--muted);
+            font-size: 14px;
+            min-height: 20px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            margin-right: 8px;
+            border: 2px solid var(--line);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin .8s linear infinite;
+            vertical-align: -2px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 10px;
+        }
+
+        .grid img {
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid var(--line);
+            background: #000;
+        }
+
+        .note {
+            color: var(--muted);
+            font-size: 13px;
+            margin-top: 12px;
+            line-height: 1.5;
+        }
+
+        .err {
+            color: #ff7b7b;
+        }
+
+        .media {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+            align-items: start;
+        }
+
+        .media img {
+            width: 100%;
+            border-radius: 10px;
+            background: #fff;
+        }
+
+        @media (max-width: 700px) {
+            .media {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        footer {
+            color: var(--muted);
+            font-size: 13px;
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        .grid figure { margin: 0; }
+        .grid figure img { display: block; border: 2px solid var(--line); }
+        .grid figure.ok img, .cmp-grid figure.ok img { border-color: #3ecf8e; }
+        .grid figure.bad img, .cmp-grid figure.bad img { border-color: #ff7b7b; }
+        figcaption { font-size: 12px; color: var(--muted); text-align: center; margin-top: 4px; }
+        .cmp-row { margin-top: 18px; }
+        .cmp-row h3 { margin: 0 0 8px; font-size: 15px; }
+        .cmp-row h3 span { color: var(--muted); font-weight: 400; margin-left: 10px; font-size: 13px; }
+        .cmp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; }
+        .cmp-grid figure { margin: 0; }
+        .cmp-grid img { display: block; width: 100%; border-radius: 8px; border: 2px solid var(--line); background: #000; }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <h1>Diffusion MNIST</h1>
+        <p class="sub">A DDPM-style model built from scratch in PyTorch. Pick a digit and generate new handwritten
+            samples from pure noise.</p>
+
+        <div class="card">
+            <h2>Generate</h2>
+            <div class="digits" id="digits"></div>
+
+            <div class="controls">
+                <div>
+                    <label>How many samples <b id="countVal">8</b></label>
+                    <input type="range" id="count" min="1" max="16" step="1" value="8">
+                </div>
+                <div>
+                    <label>Guidance w <b id="wVal">1.2</b></label>
+                    <input type="range" id="w" min="0" max="2" step="0.1" value="1.2">
+                </div>
+                <div>
+                    <label>DDIM steps <b id="stepsVal">20</b></label>
+                    <input type="range" id="steps" min="5" max="100" step="5" value="20">
+                </div>
+                <div>
+                    <label>Seed</label>
+                    <div class="row">
+                        <input type="number" id="seed" value="0" min="0">
+                        <button class="small" id="rand" type="button">Random</button>
+                    </div>
+                </div>
+            </div>
+
+            <button class="go" id="go" type="button">Generate</button>
+            <div class="status" id="status"></div>
+            <div class="grid" id="grid" style="margin-top:14px"></div>
+            <p class="note">
+                w = 0 ignores the label. In my sweep (DDIM 50 steps) label accuracy peaked around w = 1.1 to 1.2, and
+                fell quickly above 1.5. Try w = 2 to see the digits break down.
+            </p>
+            <p class="note">
+                Green border: a separate small CNN classifier (98.52% on real test digits) reads the image as the
+                requested digit. Red border: it reads another digit. This is a rough check, not proof.
+            </p>
+        </div>
+
+        <div class="card">
+            <h2>Compare guidance (same seed, same starting noise)</h2>
+            <p class="note" style="margin-top:0">Uses the digit, steps and seed chosen above (at most 8 samples per
+                row) and compares w = 0, 1.2 and 2 side by side.</p>
+            <button class="go" id="cmp" type="button" style="margin-top:12px">Compare w = 0, 1.2, 2</button>
+            <div class="status" id="cmpStatus"></div>
+            <div id="cmpOut"></div>
+        </div>
+
+        <div class="card">
+            <h2>How it looks while denoising</h2>
+            <div class="media">
+                <div>
+                    <img src="/results/denoising.gif" alt="Denoising animation">
+                    <p class="note">Static turning into digits 0 to 9 (conditional model, DDIM, w = 1.2).</p>
+                </div>
+                <div>
+                    <img src="/results/w_sweep.png" alt="Label accuracy vs guidance w">
+                    <p class="note">Label accuracy vs guidance strength (100 samples per label, DDIM 50 steps).</p>
+                </div>
+            </div>
+        </div>
+
+        <footer>Built with PyTorch and FastAPI. <a style="color:var(--accent)" href="/docs">API docs</a></footer>
+    </div>
+
+    <script>
+        let digit = 7;
+        const $ = (id) => document.getElementById(id);
+
+        // digit buttons
+        const digitsEl = $("digits");
+        for (let d = 0; d <= 9; d++) {
+            const b = document.createElement("button");
+            b.textContent = d;
+            b.type = "button";
+            if (d === digit) b.classList.add("active");
+            b.onclick = () => {
+                digit = d;
+                [...digitsEl.children].forEach((c, i) => c.classList.toggle("active", i === d));
+            };
+            digitsEl.appendChild(b);
+        }
+
+        // live slider labels
+        [["count", "countVal"], ["w", "wVal"], ["steps", "stepsVal"]].forEach(([i, v]) => {
+            $(i).addEventListener("input", () => { $(v).textContent = $(i).value; });
+        });
+
+        $("rand").onclick = () => { $("seed").value = Math.floor(Math.random() * 100000); };
+
+        function card(it, want) {
+            const f = document.createElement("figure");
+            f.className = it.pred === want ? "ok" : "bad";
+            const img = document.createElement("img");
+            img.src = "data:image/png;base64," + it.image;
+            const cap = document.createElement("figcaption");
+            cap.textContent = "read as " + it.pred + " (" + Math.round(it.conf * 100) + "%)";
+            f.appendChild(img);
+            f.appendChild(cap);
+            return f;
+        }
+
+        $("cmp").onclick = async () => {
+            const btn = $("cmp"), status = $("cmpStatus"), out = $("cmpOut");
+            const body = {
+                digit: digit,
+                count: Math.min(parseInt($("count").value), 8),
+                ws: [0, 1.2, 2],
+                steps: parseInt($("steps").value),
+                seed: parseInt($("seed").value) || 0,
+            };
+            btn.disabled = true;
+            status.className = "status";
+            status.innerHTML = '<span class="spinner"></span>Generating three sets (about three times as long as one)...';
+            try {
+                const res = await fetch("/api/compare", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body),
+                });
+                if (!res.ok) throw new Error("Server error " + res.status);
+                const data = await res.json();
+                out.innerHTML = "";
+                data.results.forEach((r) => {
+                    const row = document.createElement("div");
+                    row.className = "cmp-row";
+                    const h = document.createElement("h3");
+                    h.textContent = "w = " + r.w;
+                    const sp = document.createElement("span");
+                    sp.textContent = r.matches + " of " + data.count + " read as " + data.digit;
+                    h.appendChild(sp);
+                    const g = document.createElement("div");
+                    g.className = "cmp-grid";
+                    r.items.forEach((it) => g.appendChild(card(it, data.digit)));
+                    row.appendChild(h);
+                    row.appendChild(g);
+                    out.appendChild(row);
+                });
+                status.textContent = "Done in " + data.seconds + " s (digit " + data.digit + ", " + body.steps +
+                    " steps, seed " + body.seed + ", same starting noise for every w)";
+            } catch (e) {
+                status.className = "status err";
+                status.textContent = "Failed: " + e.message;
+            } finally {
+                btn.disabled = false;
+            }
+        };
+
+        $("go").onclick = async () => {
+            const btn = $("go"), status = $("status"), grid = $("grid");
+            const body = {
+                digit: digit,
+                count: parseInt($("count").value),
+                w: parseFloat($("w").value),
+                steps: parseInt($("steps").value),
+                seed: parseInt($("seed").value) || 0,
+            };
+            btn.disabled = true;
+            status.className = "status";
+            status.innerHTML = '<span class="spinner"></span>Generating on the server (this takes a few seconds on CPU)...';
+            try {
+                const res = await fetch("/api/generate", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body),
+                });
+                if (!res.ok) throw new Error("Server error " + res.status);
+                const data = await res.json();
+                grid.innerHTML = "";
+                data.items.forEach((it) => grid.appendChild(card(it, body.digit)));
+                status.textContent = "Done in " + data.seconds + " s. " + data.matches + " of " + data.count +
+                    " read as " + body.digit + " by the classifier (w = " + body.w + ", " + body.steps +
+                    " steps, seed " + body.seed + ")";
+            } catch (e) {
+                status.className = "status err";
+                status.textContent = "Failed: " + e.message;
+            } finally {
+                btn.disabled = false;
+            }
+        };
+    </script>
+</body>
+
+</html>

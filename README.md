@@ -101,6 +101,7 @@ Tested with Python 3.13 and PyTorch 2.15 (CPU build).
 | `python plot_diagnose.py`            | Figures from `results/diagnose.json` (counts, per-digit accuracy, confusion matrices)         |
 | `python nn_check.py`                 | Check whether generated digits are copies of training images (nearest-neighbour distance)     |
 | `uvicorn server:app --port 8000`     | Full-stack demo (FastAPI backend + web page at [http://localhost:8000](http://localhost:8000)) |
+| `uvicorn server2:app --port 8001`    | Second version of the web demo: classifier verdict under every digit and a guidance comparison  |
 
 All settings (image size, `T`, learning rate, epochs, EMA decay) live in `config.py`.
 
@@ -117,6 +118,10 @@ uvicorn server:app --port 8000
 ```
 
 [![Web demo](results/web_demo.png)](results/web_demo.png)
+
+A second version (`server2.py` with `static/index2.html`, run with `uvicorn server2:app --port 8001`) also runs the evaluation classifier on every generated digit (green border: it reads the requested digit, red: another digit) and has a "Compare guidance" button that generates `w = 0`, `1.2` and `2` from the same starting noise. The classifier verdict is a rough check, not proof.
+
+[![Web demo v2](results/web_demo2.png)](results/web_demo2.png)
 
 Needs `checkpoints/cond_ema.pt` (train it first, weights are not in the repo).
 
@@ -350,7 +355,8 @@ diffusion-mnist/
 ├── make_gif.py         # denoising GIF
 ├── app.py              # Gradio demo
 ├── server.py           # FastAPI backend (full-stack demo)
-├── static/             # web interface (index.html)
+├── server2.py          # FastAPI backend v2 (classifier verdict and guidance comparison)
+├── static/             # web interfaces (index.html, index2.html)
 ├── compare.py          # EMA vs no-EMA figure
 ├── compare_ddim.py     # DDPM vs DDIM figure
 ├── check_setup.py      # environment check
