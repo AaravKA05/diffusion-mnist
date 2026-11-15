@@ -98,6 +98,8 @@ Tested with Python 3.13 and PyTorch 2.15 (CPU build).
 | `python app.py --share`              | Same demo with a temporary public `gradio.live` link, only while the app is running           |
 | `python vae.py --epochs 10`          | Small VAE baseline, scored by the same classifier (about 40 s per epoch on a laptop CPU)       |
 | `python guidance_seeds.py`           | Repeat the `w = 1.0` against `w = 1.2` comparison over 3 seeds (about 1 hour on a laptop CPU)  |
+| `python plot_diagnose.py`            | Figures from `results/diagnose.json` (counts, per-digit accuracy, confusion matrices)         |
+| `python nn_check.py`                 | Check whether generated digits are copies of training images (nearest-neighbour distance)     |
 | `uvicorn server:app --port 8000`     | Full-stack demo (FastAPI backend + web page at [http://localhost:8000](http://localhost:8000)) |
 
 All settings (image size, `T`, learning rate, epochs, EMA decay) live in `config.py`.
@@ -284,6 +286,20 @@ A small VAE (`vae.py`, 10 epochs on the laptop CPU, latent size 32, untuned) was
 
 The classifier is more confident about the diffusion samples. The VAE is far faster per image, but the times come from different hardware, so I do not claim a speedup ratio. The VAE is small and untuned, only one seed was used, and classifier confidence is a rough measure, not FID. The VAE produced digit 1 more often (81 of 1000) than the diffusion model (32 of 1000), so the rare 1s do not seem to be a general property of generative models; the cause is still unknown.
 
+### 11. Check for copying of training images
+
+`nn_check.py` generates 100 digits (10 per digit, `w = 1.2`, DDIM 50 steps) and finds the nearest of the 60,000 training images for each, using pixel-wise Euclidean distance. As a reference, the same distance is computed for 100 real test images.
+
+| Measure                                                                      | Generated | Real test images |
+| ---------------------------------------------------------------------------- | --------- | ---------------- |
+| Median distance to the nearest training image                                | 10.59     | 7.74             |
+| Smallest distance                                                            | 3.10      | 1.93             |
+| Generated images closer to a training image than the closest test image is   | 0 of 100  | not applicable   |
+
+[![Nearest-neighbour check](results/nn_check.png)](results/nn_check.png)
+
+Top row: generated digits. Bottom row: the nearest training image of each. There is no sign that the model copies training images. This does not prove that the digits are good new samples: only 100 samples, one model and one `w` were checked, and pixel distance is a crude measure.
+
 ### Side note: earlier 16x16 runs on laptop CPU
 
 Before moving to Colab I trained 16x16 models (`BASE_CH = 32`) on a laptop CPU.
@@ -340,6 +356,9 @@ diffusion-mnist/
 ├── check_setup.py      # environment check
 ├── check_clf.py        # test accuracy of the saved classifier on real MNIST
 ├── diagnose.py         # per-digit diagnosis of unconditional and guided samples
+├── plot_diagnose.py    # figures from diagnose.json
+├── guidance_seeds.py   # guidance comparison repeated over seeds
+├── nn_check.py         # nearest-neighbour check for copying
 ├── requirements.txt
 ├── notebooks/
 ├── results/            # figures and loss histories
