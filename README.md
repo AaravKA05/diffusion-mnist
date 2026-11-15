@@ -97,6 +97,7 @@ Tested with Python 3.13 and PyTorch 2.15 (CPU build).
 | `python app.py`                      | Gradio live demo (local only)                                                                  |
 | `python app.py --share`              | Same demo with a temporary public `gradio.live` link, only while the app is running           |
 | `python vae.py --epochs 10`          | Small VAE baseline, scored by the same classifier (about 40 s per epoch on a laptop CPU)       |
+| `python guidance_seeds.py`           | Repeat the `w = 1.0` against `w = 1.2` comparison over 3 seeds (about 1 hour on a laptop CPU)  |
 | `uvicorn server:app --port 8000`     | Full-stack demo (FastAPI backend + web page at [http://localhost:8000](http://localhost:8000)) |
 
 All settings (image size, `T`, learning rate, epochs, EMA decay) live in `config.py`.
@@ -243,7 +244,7 @@ A small CNN classifier scores the generated digits. Its test accuracy is **98.52
 **Findings**
 
 - **`w = 0` ignores the label**, so accuracy is at chance level (about 10%), as expected.
-- **Guidance helps a little, and only in a narrow range.** In the sweep, accuracy peaks around `w = 1.1` to `1.2` (about 90%) versus 86.8% at `w = 1.0`. Two earlier runs (`sweep_w.py` and `evaluate.py`) differed by about 0.5 points at `w = 1.0` (86.8% vs 86.3%), but a separate run with different samples (`diagnose.py`, 50 per label) gave 92.8% at `w = 1.2`, so run-to-run differences with different draws are a few points. The gain from guidance is therefore small and not clearly separated from noise. Above `w = 1.5` accuracy falls fast.
+- **Guidance helps a little, and only in a narrow range.** In the sweep, accuracy peaks around `w = 1.1` to `1.2` (about 90%) versus 86.8% at `w = 1.0`. I repeated `w = 1.0` against `w = 1.2` on three more seeds (`guidance_seeds.py`, 100 samples per digit, same starting noise for both values): `w = 1.2` was higher every time (+3.3, +3.7, +3.6 points; mean 91.6% against 88.0%, standard deviation 1.0). So the gain is about 3.5 points and looks consistent, but only three seeds, one classifier and two values of `w` were used, so I make no significance claim. Above `w = 1.5` accuracy falls fast.
 - **A wrong first conclusion.** My first sweep only tried `w = 1, 3, 5`, and I wrongly concluded that guidance does not help. A finer sweep showed the real peak.
 - **Guidance numbers are for DDIM 50 steps.** I made no accuracy measurement for other step counts.
 
