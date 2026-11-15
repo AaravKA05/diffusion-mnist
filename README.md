@@ -96,6 +96,7 @@ Tested with Python 3.13 and PyTorch 2.15 (CPU build).
 | `python diagnose.py`                 | Per-digit diagnosis of unconditional and guided samples (about 15 to 18 min on a laptop CPU)   |
 | `python app.py`                      | Gradio live demo (local only)                                                                  |
 | `python app.py --share`              | Same demo with a temporary public `gradio.live` link, only while the app is running           |
+| `python vae.py --epochs 10`          | Small VAE baseline, scored by the same classifier (about 40 s per epoch on a laptop CPU)       |
 | `uvicorn server:app --port 8000`     | Full-stack demo (FastAPI backend + web page at [http://localhost:8000](http://localhost:8000)) |
 
 All settings (image size, `T`, learning rate, epochs, EMA decay) live in `config.py`.
@@ -266,6 +267,20 @@ A stopwatch in the Gradio demo gave about 4.9 s for 20 steps and about 12 s for 
 
 **`w = 3.0` is below chance.** 17 of 500 samples (3.4%) matched the requested label. No sample was classified as 1 for any label, and the most predicted classes were 2 (118) and 0 (92). The classifier stays fairly confident (mean 0.832) and pixels are not saturated, so the images are not simply blown out. Visually, the `w = 3.0` samples are distorted blobs and tangled strokes rather than recognisable digits (see the `w = 3.0` grid above). I did not find out why guidance this strong moves samples away from the requested digit.
 
+### 10. VAE baseline
+
+A small VAE (`vae.py`, 10 epochs on the laptop CPU, latent size 32, untuned) was scored by the same classifier on 1000 samples and compared with the unconditional diffusion model (1000 samples, DDIM 50 steps).
+
+| Measure                                  | VAE                                        | Diffusion                                  |
+| ---------------------------------------- | ------------------------------------------ | ------------------------------------------ |
+| Samples with classifier confidence > 0.9 | 39.7%                                      | 74.4%                                      |
+| Predicted class counts (digits 0 to 9)   | 70, 81, 101, 159, 61, 70, 66, 127, 86, 179 | 154, 32, 153, 128, 67, 94, 81, 92, 94, 105 |
+| Time for 64 images                       | 0.019 s (laptop CPU)                       | 1.1 s (DDIM 50, T4 GPU)                    |
+
+[![VAE samples](results/vae_samples.png)](results/vae_samples.png)
+
+The classifier is more confident about the diffusion samples. The VAE is far faster per image, but the times come from different hardware, so I do not claim a speedup ratio. The VAE is small and untuned, only one seed was used, and classifier confidence is a rough measure, not FID. The VAE produced digit 1 more often (81 of 1000) than the diffusion model (32 of 1000), so the rare 1s do not seem to be a general property of generative models; the cause is still unknown.
+
 ### Side note: earlier 16x16 runs on laptop CPU
 
 Before moving to Colab I trained 16x16 models (`BASE_CH = 32`) on a laptop CPU.
@@ -308,6 +323,7 @@ diffusion-mnist/
 ├── diffusion.py        # noise schedule, q_sample, DDPM and DDIM sampling
 ├── model.py            # time embedding + U-Net (optionally class-conditional)
 ├── train.py            # training loop, EMA, overfit test
+├── vae.py              # small VAE baseline
 ├── sample.py           # unconditional sampling (DDPM / DDIM)
 ├── sample_cond.py      # conditional sampling with guidance
 ├── evaluate.py         # classifier-based evaluation
