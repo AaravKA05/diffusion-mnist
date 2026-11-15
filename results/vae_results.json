@@ -1,0 +1,18 @@
+{
+  "n_samples": 1000,
+  "share_conf_above_0.9": 0.397,
+  "mean_confidence": 0.7797,
+  "class_counts": [
+    70,
+    81,
+    101,
+    159,
+    61,
+    70,
+    66,
+    127,
+    86,
+    179
+  ],
+  "seconds_for_64_images": 0.019
+}
