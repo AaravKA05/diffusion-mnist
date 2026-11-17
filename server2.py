@@ -13,6 +13,7 @@ from pathlib import Path
 import torch
 import torch.nn.functional as F
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
@@ -43,6 +44,14 @@ lock = threading.Lock()  # one generation at a time (CPU)
 
 app = FastAPI(title="Diffusion MNIST API v2")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 class GenRequest(BaseModel):
     digit: int = Field(7, ge=0, le=9)
@@ -55,7 +64,9 @@ class GenRequest(BaseModel):
 class CompareRequest(BaseModel):
     digit: int = Field(7, ge=0, le=9)
     count: int = Field(6, ge=1, le=8)
-    ws: list[float] = Field(default_factory=lambda: [0.0, 1.2, 2.0], min_length=2, max_length=4)
+    ws: list[float] = Field(
+        default_factory=lambda: [0.0, 1.2, 2.0], min_length=2, max_length=4
+    )
     steps: int = Field(20, ge=5, le=100)
     seed: int = Field(0, ge=0, le=2**31 - 1)
 
@@ -83,7 +94,11 @@ def run(digit, count, w, steps, seed, size):
     conf, pred = probs.max(1)
     imgs, conf, pred = imgs.cpu(), conf.cpu(), pred.cpu()
     items = [
-        {"image": tensor_to_png_b64(im, size), "pred": int(p), "conf": round(float(c), 3)}
+        {
+            "image": tensor_to_png_b64(im, size),
+            "pred": int(p),
+            "conf": round(float(c), 3),
+        }
         for im, p, c in zip(imgs, pred, conf)
     ]
     matches = sum(1 for it in items if it["pred"] == digit)
