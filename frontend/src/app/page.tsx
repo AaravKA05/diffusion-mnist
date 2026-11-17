@@ -32,13 +32,30 @@ type GenerationRecord = {
   items: GeneratedItem[];
 };
 
+type EvaluationResult = {
+  matches: number;
+  class_consistency: number;
+  mean_confidence: number;
+  diversity_mean_pairwise_l1: number;
+  mean_pixel_std: number;
+  seconds: number;
+  images_per_second: number;
+  items: GeneratedItem[];
+  params: {
+    digit: number;
+    count: number;
+    w: number;
+    steps: number;
+    seed: number;
+  };
+};
+
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, 1);
 
     request.onupgradeneeded = () => {
       const db = request.result;
-
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME, { keyPath: "id" });
       }
@@ -77,13 +94,11 @@ async function getGenerations(): Promise<GenerationRecord[]> {
 
     request.onsuccess = () => {
       const records = request.result as GenerationRecord[];
-
       records.sort(
         (a, b) =>
           new Date(b.createdAt).getTime() -
           new Date(a.createdAt).getTime()
       );
-
       db.close();
       resolve(records);
     };
@@ -154,17 +169,6 @@ function downloadImage(image: string, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function downloadGeneration(record: GenerationRecord) {
-  record.items.forEach((item, index) => {
-    setTimeout(() => {
-      downloadImage(
-        item.image,
-        `digit-${record.digit}-sample-${index + 1}.png`
-      );
-    }, index * 250);
-  });
-}
-
 function ImageCard({
   item,
   index,
@@ -196,7 +200,7 @@ function ImageCard({
       {onDownload && (
         <button
           onClick={onDownload}
-          className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 py-2 text-xs text-slate-300 transition hover:bg-white/10"
+          className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 py-2 text-xs text-slate-300 hover:bg-white/10"
         >
           ↓ Download
         </button>
@@ -226,20 +230,16 @@ function StatCard({
 }
 
 export default function Home() {
+  const [activeTab, setActiveTab] = useState("Studio");
+
   const [digit, setDigit] = useState(7);
   const [count, setCount] = useState(8);
   const [guidance, setGuidance] = useState(1.2);
   const [steps, setSteps] = useState(50);
   const [seed, setSeed] = useState(42);
 
-  const [activeTab, setActiveTab] = useState("Studio");
-
   const [images, setImages] = useState<GeneratedItem[]>([]);
   const [loading, setLoading] = useState(false);
-
-  const [error, setError] = useState("");
-  const [status, setStatus] = useState("");
-
   const [elapsed, setElapsed] = useState<number | null>(null);
   const [matches, setMatches] = useState<number | null>(null);
 
@@ -251,32 +251,37 @@ export default function Home() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState("");
 
-  // BACKEND HEALTH MONITORING
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
   const [backendDevice, setBackendDevice] = useState("Checking...");
   const [imageSize, setImageSize] = useState<number | null>(null);
 
-  // LOAD SAVED HISTORY
+  const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
+
+  // EVALUATION STATES
+  const [evalDigit, setEvalDigit] = useState(7);
+  const [evalCount, setEvalCount] = useState(8);
+  const [evalGuidance, setEvalGuidance] = useState(1.2);
+  const [evalSteps, setEvalSteps] = useState(20);
+  const [evalSeed, setEvalSeed] = useState(42);
+  const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null);
+  const [evaluationLoading, setEvaluationLoading] = useState(false);
+  const [evaluationError, setEvaluationError] = useState("");
+
+  // LOAD HISTORY
   useEffect(() => {
     let mounted = true;
 
     async function loadHistory() {
       try {
         const records = await getGenerations();
-
-        if (mounted) {
-          setHistory(records);
-        }
+        if (mounted) setHistory(records);
       } catch {
         if (mounted) {
-          setHistoryError(
-            "Could not load saved generations from this browser."
-          );
+          setHistoryError("Could not load saved generations.");
         }
       } finally {
-        if (mounted) {
-          setHistoryLoading(false);
-        }
+        if (mounted) setHistoryLoading(false);
       }
     }
 
@@ -287,7 +292,7 @@ export default function Home() {
     };
   }, []);
 
-  // CHECK BACKEND EVERY 10 SECONDS
+  // BACKEND HEALTH MONITOR
   useEffect(() => {
     let mounted = true;
 
@@ -316,7 +321,6 @@ export default function Home() {
     }
 
     checkBackend();
-
     const interval = setInterval(checkBackend, 10000);
 
     return () => {
@@ -373,14 +377,14 @@ export default function Home() {
         setHistory((previous) => [record, ...previous]);
       } catch {
         setStatus(
-          "Generation completed, but browser storage could not save this result."
+          "Generation completed, but browser storage could not save the result."
         );
       }
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "Unable to connect to the backend."
+          : "Unable to connect to backend."
       );
       setStatus("");
     } finally {
@@ -388,7 +392,7 @@ export default function Home() {
     }
   }
 
-  // COMPARE GUIDANCE
+  // GUIDANCE COMPARISON
   async function compareGuidance() {
     setCompareLoading(true);
     setError("");
@@ -416,7 +420,7 @@ export default function Home() {
 
       setCompareResults(data.results);
       setCompareTime(data.seconds);
-      setStatus("Guidance comparison completed successfully.");
+      setStatus("Guidance comparison completed.");
     } catch (err) {
       setError(
         err instanceof Error
@@ -425,6 +429,41 @@ export default function Home() {
       );
     } finally {
       setCompareLoading(false);
+    }
+  }
+
+  // RUN EVALUATION
+  async function runEvaluation() {
+    setEvaluationLoading(true);
+    setEvaluationError("");
+    setEvaluation(null);
+
+    try {
+      const response = await fetch(`${API}/api/evaluate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          digit: evalDigit,
+          count: evalCount,
+          w: evalGuidance,
+          steps: evalSteps,
+          seed: evalSeed,
+        }),
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(`Evaluation failed (${response.status}): ${message}`);
+      }
+
+      const data: EvaluationResult = await response.json();
+      setEvaluation(data);
+    } catch (err) {
+      setEvaluationError(
+        err instanceof Error ? err.message : "Evaluation failed."
+      );
+    } finally {
+      setEvaluationLoading(false);
     }
   }
 
@@ -443,9 +482,7 @@ export default function Home() {
   async function removeRecord(id: string) {
     try {
       await deleteGeneration(id);
-      setHistory((previous) =>
-        previous.filter((item) => item.id !== id)
-      );
+      setHistory((previous) => previous.filter((item) => item.id !== id));
       setHistoryError("");
     } catch {
       setHistoryError("Could not delete this generation.");
@@ -454,11 +491,7 @@ export default function Home() {
 
   // DELETE ALL RECORDS
   async function removeAllRecords() {
-    if (
-      !window.confirm(
-        "Delete all saved generations from this browser?"
-      )
-    ) {
+    if (!window.confirm("Delete all saved generations from this browser?")) {
       return;
     }
 
@@ -471,7 +504,7 @@ export default function Home() {
     }
   }
 
-  // INSIGHTS CALCULATIONS
+  // ACTIVITY STATISTICS
   const totalImages = history.reduce(
     (total, record) => total + record.items.length,
     0
@@ -483,18 +516,20 @@ export default function Home() {
       history.length
       : 0;
 
-  const totalSamples = history.reduce(
-    (total, record) => total + record.items.length,
-    0
-  );
-
   const totalMatches = history.reduce(
     (total, record) => total + record.matches,
     0
   );
 
   const matchRate =
-    totalSamples > 0 ? (totalMatches / totalSamples) * 100 : 0;
+    totalImages > 0 ? (totalMatches / totalImages) * 100 : 0;
+
+  const tabs = [
+    ["◈", "Studio"],
+    ["▦", "My Generations"],
+    ["◉", "Model Insights"],
+    ["◎", "Evaluation"],
+  ];
 
   return (
     <main className="min-h-screen bg-[#080b14] text-white selection:bg-violet-500/30">
@@ -512,7 +547,6 @@ export default function Home() {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 text-xl font-bold">
               D
             </div>
-
             <div>
               <h1 className="text-lg font-semibold">DiffusionLab</h1>
               <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">
@@ -526,11 +560,7 @@ export default function Home() {
           </p>
 
           <nav className="space-y-2">
-            {[
-              ["◈", "Studio"],
-              ["▦", "My Generations"],
-              ["◉", "Model Insights"],
-            ].map(([icon, name]) => (
+            {tabs.map(([icon, name]) => (
               <button
                 key={name}
                 onClick={() => setActiveTab(name)}
@@ -555,15 +585,7 @@ export default function Home() {
                     : "bg-amber-400"
                   }`}
               />
-
-              <span
-                className={`text-xs ${backendOnline === true
-                  ? "text-emerald-300"
-                  : backendOnline === false
-                    ? "text-red-300"
-                    : "text-amber-300"
-                  }`}
-              >
+              <span className="text-xs text-slate-300">
                 {backendOnline === true
                   ? "API Connected"
                   : backendOnline === false
@@ -571,7 +593,6 @@ export default function Home() {
                     : "Checking API..."}
               </span>
             </div>
-
             <p className="text-sm font-medium">MNIST Model</p>
             <p className="mt-1 text-xs text-slate-500">
               Conditional DDPM · EMA
@@ -584,32 +605,49 @@ export default function Home() {
 
         {/* MAIN CONTENT */}
         <section className="min-w-0 flex-1 px-5 py-7 sm:px-8 lg:px-10">
+          {/* MOBILE NAVIGATION */}
+          <div className="mb-6 flex gap-2 overflow-x-auto lg:hidden">
+            {tabs.map(([icon, name]) => (
+              <button
+                key={name}
+                onClick={() => setActiveTab(name)}
+                className={`shrink-0 rounded-xl border px-3 py-2 text-xs ${activeTab === name
+                  ? "border-violet-400/30 bg-violet-500/15 text-white"
+                  : "border-white/10 bg-white/5 text-slate-400"
+                  }`}
+              >
+                {icon} {name}
+              </button>
+            ))}
+          </div>
+
           {/* HEADER */}
           <header className="mb-10 flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="mb-2 text-xs tracking-widest text-violet-300">
                 YOUR GENERATIVE WORKSPACE
               </p>
-
               <h2 className="text-3xl font-semibold sm:text-4xl">
                 {activeTab === "Studio"
                   ? "Creative Studio"
                   : activeTab === "My Generations"
                     ? "My Generations"
-                    : "Model Insights"}
+                    : activeTab === "Evaluation"
+                      ? "Model Evaluation"
+                      : "Model Insights"}
                 <span className="text-violet-400">.</span>
               </h2>
-
               <p className="mt-2 text-sm text-slate-500">
                 {activeTab === "Studio"
                   ? "Explore handwritten digit generation with diffusion models."
                   : activeTab === "My Generations"
                     ? "Your previously generated samples, saved in this browser."
-                    : "A summary of your generation activity and model configuration."}
+                    : activeTab === "Evaluation"
+                      ? "Evaluate class consistency, confidence, diversity and inference speed."
+                      : "A summary of your generation activity and model configuration."}
               </p>
             </div>
 
-            {/* LIVE BACKEND STATUS */}
             <div className="flex items-center gap-3 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2.5">
               <span
                 className={`h-2 w-2 rounded-full ${backendOnline === true
@@ -619,7 +657,6 @@ export default function Home() {
                     : "bg-amber-400"
                   }`}
               />
-
               <span className="text-xs text-slate-300">
                 {backendOnline === true
                   ? `Backend Online · ${backendDevice.toUpperCase()}`
@@ -633,7 +670,6 @@ export default function Home() {
           {/* STUDIO */}
           {activeTab === "Studio" && (
             <>
-              {/* MODEL STATS */}
               <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <StatCard
                   label="MODEL"
@@ -652,28 +688,20 @@ export default function Home() {
                 />
               </div>
 
-              {/* GENERATION STUDIO */}
               <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_0.85fr]">
                 {/* CONTROLS */}
-                <div className="rounded-3xl border border-white/10 bg-[#111522]/80 p-6 backdrop-blur-2xl sm:p-8">
-                  <div className="mb-7">
-                    <p className="text-xs tracking-widest text-violet-300">
-                      01 / CONFIGURATION
-                    </p>
-                    <h3 className="mt-2 text-xl font-semibold">
-                      Generation Controls
-                    </h3>
-                  </div>
+                <div className="rounded-3xl border border-white/10 bg-[#111522]/80 p-6 sm:p-8">
+                  <p className="text-xs tracking-widest text-violet-300">
+                    01 / CONFIGURATION
+                  </p>
+                  <h3 className="mt-2 text-xl font-semibold">
+                    Generation Controls
+                  </h3>
 
-                  {/* DIGIT SELECTOR */}
-                  <div className="mb-8">
+                  <div className="mb-8 mt-7">
                     <div className="mb-4 flex justify-between text-sm">
-                      <label className="text-slate-300">
-                        Select a digit
-                      </label>
-                      <span className="text-violet-300">
-                        Selected: {digit}
-                      </span>
+                      <label className="text-slate-300">Select a digit</label>
+                      <span className="text-violet-300">Selected: {digit}</span>
                     </div>
 
                     <div className="grid grid-cols-5 gap-3 sm:grid-cols-10">
@@ -681,9 +709,9 @@ export default function Home() {
                         <button
                           key={i}
                           onClick={() => setDigit(i)}
-                          className={`aspect-square rounded-xl border text-lg font-semibold transition hover:-translate-y-1 ${digit === i
-                            ? "border-violet-400 bg-gradient-to-br from-violet-500 to-blue-600 text-white shadow-lg shadow-violet-500/20"
-                            : "border-white/10 bg-white/[0.035] text-slate-400 hover:border-violet-400/50"
+                          className={`aspect-square rounded-xl border text-lg font-semibold ${digit === i
+                            ? "border-violet-400 bg-gradient-to-br from-violet-500 to-blue-600 text-white"
+                            : "border-white/10 bg-white/[0.035] text-slate-400"
                             }`}
                         >
                           {i}
@@ -692,16 +720,12 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {/* SLIDERS */}
                   <div className="space-y-7">
                     <div>
                       <div className="mb-3 flex justify-between text-sm">
-                        <label className="text-slate-300">
-                          Number of samples
-                        </label>
+                        <label>Number of samples</label>
                         <span>{count}</span>
                       </div>
-
                       <input
                         type="range"
                         min="1"
@@ -714,35 +738,27 @@ export default function Home() {
 
                     <div>
                       <div className="mb-3 flex justify-between text-sm">
-                        <label className="text-slate-300">
-                          Guidance scale
-                        </label>
+                        <label>Guidance scale</label>
                         <span className="text-violet-300">
                           {guidance.toFixed(1)}
                         </span>
                       </div>
-
                       <input
                         type="range"
                         min="0"
                         max="3"
                         step="0.1"
                         value={guidance}
-                        onChange={(e) =>
-                          setGuidance(Number(e.target.value))
-                        }
+                        onChange={(e) => setGuidance(Number(e.target.value))}
                         className="w-full accent-violet-500"
                       />
                     </div>
 
                     <div>
                       <div className="mb-3 flex justify-between text-sm">
-                        <label className="text-slate-300">
-                          DDIM sampling steps
-                        </label>
+                        <label>DDIM sampling steps</label>
                         <span className="text-violet-300">{steps}</span>
                       </div>
-
                       <input
                         type="range"
                         min="5"
@@ -754,12 +770,8 @@ export default function Home() {
                       />
                     </div>
 
-                    {/* SEED */}
                     <div>
-                      <label className="mb-3 block text-sm text-slate-300">
-                        Random seed
-                      </label>
-
+                      <label className="mb-3 block text-sm">Random seed</label>
                       <div className="flex gap-3">
                         <input
                           type="number"
@@ -770,21 +782,17 @@ export default function Home() {
                             setSeed(
                               Math.max(
                                 0,
-                                Math.min(
-                                  2147483647,
-                                  Number(e.target.value) || 0
-                                )
+                                Math.min(2147483647, Number(e.target.value) || 0)
                               )
                             )
                           }
-                          className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none focus:border-violet-400"
+                          className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none"
                         />
-
                         <button
                           onClick={() =>
                             setSeed(Math.floor(Math.random() * 100000))
                           }
-                          className="rounded-xl border border-white/10 bg-white/5 px-4 text-xs text-slate-300 hover:bg-white/10"
+                          className="rounded-xl border border-white/10 bg-white/5 px-4 text-xs"
                         >
                           ↻ Random
                         </button>
@@ -792,21 +800,16 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {/* GENERATE BUTTON */}
                   <button
                     onClick={generateImages}
-                    disabled={
-                      loading || compareLoading || backendOnline !== true
-                    }
-                    className="mt-9 w-full rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 py-4 font-semibold text-white shadow-lg shadow-violet-600/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={loading || compareLoading || backendOnline !== true}
+                    className="mt-9 w-full rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 py-4 font-semibold disabled:opacity-50"
                   >
                     {loading
                       ? "◌ Generating..."
-                      : backendOnline === false
-                        ? "Backend Offline"
-                        : backendOnline === null
-                          ? "Checking Backend..."
-                          : "✦ Generate Images"}
+                      : backendOnline === true
+                        ? "✦ Generate Images"
+                        : "Backend Unavailable"}
                   </button>
 
                   <div className="mt-4 text-center text-xs text-slate-400">
@@ -820,34 +823,24 @@ export default function Home() {
                   )}
                 </div>
 
-                {/* GENERATION OUTPUT */}
-                <div className="flex min-h-[480px] flex-col rounded-3xl border border-white/10 bg-[#111522]/70 p-6 backdrop-blur-2xl sm:p-8">
-                  <div className="mb-6 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs tracking-widest text-cyan-300">
-                        02 / OUTPUT
-                      </p>
-                      <h3 className="mt-2 text-xl font-semibold">
-                        Generation Preview
-                      </h3>
-                    </div>
-
-                    <span className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400">
-                      {images.length ? "Generated" : "Awaiting generation"}
-                    </span>
-                  </div>
+                {/* OUTPUT */}
+                <div className="flex min-h-[480px] flex-col rounded-3xl border border-white/10 bg-[#111522]/70 p-6 sm:p-8">
+                  <p className="text-xs tracking-widest text-cyan-300">
+                    02 / OUTPUT
+                  </p>
+                  <h3 className="mb-6 mt-2 text-xl font-semibold">
+                    Generation Preview
+                  </h3>
 
                   {images.length === 0 ? (
                     <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-black/20 p-8 text-center">
                       <div className="mb-6 flex h-24 w-24 items-center justify-center rounded-3xl border border-violet-400/20 bg-violet-500/10 text-5xl text-violet-300">
                         {digit}
                       </div>
-
                       <h4 className="text-lg font-medium">
                         Your canvas is ready
                       </h4>
-
-                      <p className="mt-2 max-w-xs text-sm leading-6 text-slate-500">
+                      <p className="mt-2 max-w-xs text-sm text-slate-500">
                         Generate handwritten samples using your trained
                         diffusion model.
                       </p>
@@ -857,7 +850,7 @@ export default function Home() {
                       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
                         {images.map((item, index) => (
                           <ImageCard
-                            key={`${index}-${item.pred}`}
+                            key={index}
                             item={item}
                             index={index}
                             selectedDigit={digit}
@@ -872,23 +865,16 @@ export default function Home() {
                       </div>
 
                       <div className="mb-4 grid grid-cols-2 gap-3">
-                        <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-3">
-                          <p className="text-[10px] text-slate-500">
-                            Classifier matches
-                          </p>
-                          <p className="mt-1 text-xl font-semibold text-emerald-400">
-                            {matches}/{images.length}
-                          </p>
-                        </div>
-
-                        <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-3">
-                          <p className="text-[10px] text-slate-500">
-                            Inference time
-                          </p>
-                          <p className="mt-1 text-xl font-semibold">
-                            {elapsed} s
-                          </p>
-                        </div>
+                        <StatCard
+                          label="CLASSIFIER MATCHES"
+                          value={`${matches}/${images.length}`}
+                          description="Predictions matching requested digit"
+                        />
+                        <StatCard
+                          label="INFERENCE TIME"
+                          value={`${elapsed} s`}
+                          description="Generation time"
+                        />
                       </div>
 
                       <button
@@ -904,7 +890,7 @@ export default function Home() {
                             )
                           )
                         }
-                        className="mt-auto w-full rounded-xl border border-violet-400/20 bg-violet-500/10 py-3 text-sm font-medium text-violet-200 transition hover:bg-violet-500/20"
+                        className="mt-auto w-full rounded-xl border border-violet-400/20 bg-violet-500/10 py-3 text-sm text-violet-200"
                       >
                         ↓ Download All Images
                       </button>
@@ -914,177 +900,109 @@ export default function Home() {
               </div>
 
               {/* GUIDANCE COMPARISON */}
-              <section className="mt-8 rounded-3xl border border-white/10 bg-[#111522]/80 p-6 backdrop-blur-2xl sm:p-8">
-                <div className="mb-6">
-                  <p className="text-xs tracking-widest text-cyan-300">
-                    03 / MODEL EXPERIMENTATION
-                  </p>
+              <section className="mt-8 rounded-3xl border border-white/10 bg-[#111522]/80 p-6 sm:p-8">
+                <p className="text-xs tracking-widest text-cyan-300">
+                  03 / MODEL EXPERIMENTATION
+                </p>
+                <h3 className="mt-2 text-2xl font-semibold">
+                  Guidance Comparison
+                </h3>
+                <p className="mt-2 text-sm text-slate-400">
+                  Compare how classifier-free guidance changes generated
+                  digits.
+                </p>
 
-                  <h3 className="mt-2 text-2xl font-semibold">
-                    Guidance Comparison
-                    <span className="text-violet-400">.</span>
-                  </h3>
-
-                  <p className="mt-2 text-sm text-slate-400">
-                    Compare how classifier-free guidance changes the generated
-                    digits.
-                  </p>
+                <div className="my-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <StatCard
+                    label="GUIDANCE SCALES"
+                    value="0.0 · 1.2 · 2.0"
+                    description="Three configurations"
+                  />
+                  <StatCard
+                    label="STARTING NOISE"
+                    value={`Seed ${seed}`}
+                    description="Same seed across experiments"
+                  />
+                  <StatCard
+                    label="DDIM STEPS"
+                    value={String(steps)}
+                    description="Sampling steps"
+                  />
                 </div>
 
-                <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  {[
-                    ["GUIDANCE SCALES", "0.0 · 1.2 · 2.0"],
-                    ["SAME STARTING NOISE", `Seed ${seed}`],
-                    ["DDIM STEPS", `${steps} steps`],
-                  ].map(([label, value]) => (
-                    <div
-                      key={label}
-                      className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-4"
-                    >
-                      <p className="text-[10px] tracking-widest text-slate-500">
-                        {label}
-                      </p>
-                      <p className="mt-2 text-sm font-semibold text-slate-200">
-                        {value}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-sm text-slate-400">
-                    Digit {digit} · {Math.min(count, 8)} samples per guidance
-                    scale
-                  </p>
-
-                  <span className="text-xs text-slate-500">
-                    3 guidance settings
-                  </span>
-                </div>
+                <p className="mb-5 text-sm text-slate-400">
+                  Digit {digit} · {Math.min(count, 8)} samples per guidance
+                  scale
+                </p>
 
                 <button
                   onClick={compareGuidance}
-                  disabled={
-                    compareLoading || loading || backendOnline !== true
-                  }
-                  className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 py-4 font-semibold text-white shadow-lg shadow-violet-600/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={compareLoading || loading || backendOnline !== true}
+                  className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 py-4 font-semibold disabled:opacity-50"
                 >
                   {compareLoading
-                    ? "◌ Comparing guidance scales..."
+                    ? "◌ Comparing..."
                     : "✦ Compare Guidance — 0.0 vs 1.2 vs 2.0"}
                 </button>
 
                 {compareLoading && (
-                  <div className="mt-6 rounded-xl border border-violet-400/20 bg-violet-500/5 p-5 text-center">
-                    <p className="text-sm text-violet-300">
-                      Running three sampling experiments...
-                    </p>
-                    <p className="mt-2 text-xs text-slate-500">
-                      This may take a little time on CPU.
-                    </p>
-                  </div>
+                  <p className="mt-5 text-center text-sm text-violet-300">
+                    Running three sampling experiments...
+                  </p>
                 )}
 
                 {compareResults.length > 0 && (
-                  <div className="mt-8">
-                    <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <h4 className="text-lg font-semibold">
-                          Experiment Results
-                        </h4>
-                        <p className="mt-1 text-xs text-slate-500">
-                          Same digit, seed and DDIM steps across all
-                          experiments.
-                        </p>
-                      </div>
+                  <div className="mt-8 space-y-8">
+                    <p className="text-sm text-slate-400">
+                      Total inference time: {compareTime} seconds
+                    </p>
 
-                      <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2">
-                        <p className="text-[10px] text-slate-500">
-                          TOTAL INFERENCE TIME
-                        </p>
-                        <p className="mt-1 text-lg font-semibold text-cyan-300">
-                          {compareTime} s
-                        </p>
-                      </div>
-                    </div>
+                    {compareResults.map((result) => {
+                      const accuracy =
+                        result.items.length > 0
+                          ? (result.matches / result.items.length) * 100
+                          : 0;
 
-                    <div className="space-y-8">
-                      {compareResults.map((result) => {
-                        const accuracy =
-                          result.items.length > 0
-                            ? (result.matches / result.items.length) * 100
-                            : 0;
-
-                        return (
-                          <div
-                            key={result.w}
-                            className="rounded-2xl border border-white/[0.08] bg-black/20 p-4 sm:p-5"
-                          >
-                            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                              <div>
-                                <p className="text-xs tracking-widest text-violet-300">
-                                  GUIDANCE SCALE
-                                </p>
-                                <h5 className="mt-1 text-2xl font-bold">
-                                  w = {result.w}
-                                </h5>
-                              </div>
-
-                              <div className="text-right">
-                                <p className="text-sm font-semibold text-emerald-400">
-                                  {result.matches}/{result.items.length} matches
-                                </p>
-                                <p className="mt-1 text-xs text-slate-500">
-                                  {accuracy.toFixed(1)}% classifier match rate
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="mb-5 h-2 overflow-hidden rounded-full bg-white/10">
-                              <div
-                                className="h-full rounded-full bg-gradient-to-r from-blue-500 to-violet-500 transition-all duration-500"
-                                style={{ width: `${accuracy}%` }}
-                              />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
-                              {result.items.map((item, index) => (
-                                <ImageCard
-                                  key={`${result.w}-${index}`}
-                                  item={item}
-                                  index={index}
-                                  selectedDigit={digit}
-                                />
-                              ))}
-                            </div>
+                      return (
+                        <div
+                          key={result.w}
+                          className="rounded-2xl border border-white/10 bg-black/20 p-5"
+                        >
+                          <div className="mb-4 flex justify-between">
+                            <h4 className="text-xl font-bold">
+                              Guidance w = {result.w}
+                            </h4>
+                            <span className="text-emerald-400">
+                              {result.matches}/{result.items.length} matches
+                            </span>
                           </div>
-                        );
-                      })}
-                    </div>
 
-                    <div className="mt-6 rounded-2xl border border-violet-400/20 bg-violet-500/[0.06] p-5">
-                      <h4 className="font-semibold">Comparison Summary</h4>
-                      <p className="mt-2 text-sm leading-6 text-slate-400">
-                        Classifier match rate indicates how often the separate
-                        CNN classifier predicts the requested digit. It is a
-                        useful consistency check, not a complete measure of
-                        generated image quality.
-                      </p>
-                    </div>
-                  </div>
-                )}
+                          <div className="mb-5 h-2 overflow-hidden rounded-full bg-white/10">
+                            <div
+                              className="h-full bg-gradient-to-r from-blue-500 to-violet-500"
+                              style={{ width: `${accuracy}%` }}
+                            />
+                          </div>
 
-                {!compareLoading && compareResults.length === 0 && (
-                  <div className="mt-6 rounded-2xl border border-dashed border-white/10 bg-black/20 p-8 text-center">
-                    <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-400/20 bg-violet-500/10 text-2xl text-violet-300">
-                      ◈
-                    </div>
-                    <h4 className="font-medium">
-                      Ready to compare guidance
-                    </h4>
-                    <p className="mt-2 text-sm text-slate-500">
-                      Run the experiment to see how guidance strength affects
-                      handwritten digit generation.
+                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+                            {result.items.map((item, index) => (
+                              <ImageCard
+                                key={`${result.w}-${index}`}
+                                item={item}
+                                index={index}
+                                selectedDigit={digit}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    <p className="text-sm leading-6 text-slate-400">
+                      Classifier match rate measures how often the separate
+                      CNN classifier predicts the requested digit. It is a
+                      consistency indicator, not a complete image quality
+                      metric.
                     </p>
                   </div>
                 )}
@@ -1097,9 +1015,7 @@ export default function Home() {
             <section>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-xl font-semibold">
-                    Generation History
-                  </h3>
+                  <h3 className="text-xl font-semibold">Generation History</h3>
                   <p className="mt-1 text-sm text-slate-500">
                     {history.length} saved generations · {totalImages} images
                   </p>
@@ -1108,7 +1024,7 @@ export default function Home() {
                 {history.length > 0 && (
                   <button
                     onClick={removeAllRecords}
-                    className="rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-2.5 text-xs text-red-300 transition hover:bg-red-500/20"
+                    className="rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-2.5 text-xs text-red-300"
                   >
                     Delete All History
                   </button>
@@ -1116,26 +1032,22 @@ export default function Home() {
               </div>
 
               {historyError && (
-                <p className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">
+                <p className="mb-4 rounded-xl bg-red-500/10 p-3 text-sm text-red-300">
                   {historyError}
                 </p>
               )}
 
               {historyLoading ? (
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-10 text-center text-slate-400">
+                <div className="rounded-2xl border border-white/10 p-10 text-center text-slate-400">
                   Loading saved generations...
                 </div>
               ) : history.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-white/10 bg-white/[0.025] p-12 text-center">
-                  <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-violet-400/20 bg-violet-500/10 text-3xl text-violet-300">
-                    ▦
-                  </div>
+                <div className="rounded-3xl border border-dashed border-white/10 p-12 text-center">
                   <h3 className="text-lg font-semibold">
                     No generations saved yet
                   </h3>
-                  <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">
-                    Your generated samples will automatically appear here.
-                    Head to Studio and generate your first batch.
+                  <p className="mt-2 text-sm text-slate-500">
+                    Generate samples in Studio to start building your history.
                   </p>
                   <button
                     onClick={() => setActiveTab("Studio")}
@@ -1152,40 +1064,44 @@ export default function Home() {
                       className="rounded-3xl border border-white/10 bg-[#111522]/80 p-5 sm:p-6"
                     >
                       <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/15 text-xl font-bold text-violet-300">
-                            {record.digit}
-                          </span>
-
-                          <div>
-                            <h4 className="font-semibold">
-                              Digit {record.digit} · {record.items.length}{" "}
-                              samples
-                            </h4>
-                            <p className="mt-1 text-xs text-slate-500">
-                              {new Date(record.createdAt).toLocaleString()}
-                            </p>
-                          </div>
+                        <div>
+                          <h4 className="font-semibold">
+                            Digit {record.digit} · {record.items.length} samples
+                          </h4>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {new Date(record.createdAt).toLocaleString()}
+                          </p>
                         </div>
 
                         <div className="flex flex-wrap gap-2">
                           <button
                             onClick={() => reuseSettings(record)}
-                            className="rounded-lg border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-xs text-violet-200 hover:bg-violet-500/20"
+                            className="rounded-lg border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-xs text-violet-200"
                           >
                             ↻ Reuse Settings
                           </button>
 
                           <button
-                            onClick={() => downloadGeneration(record)}
-                            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300 hover:bg-white/10"
+                            onClick={() =>
+                              record.items.forEach((item, index) =>
+                                setTimeout(
+                                  () =>
+                                    downloadImage(
+                                      item.image,
+                                      `digit-${record.digit}-sample-${index + 1}.png`
+                                    ),
+                                  index * 250
+                                )
+                              )
+                            }
+                            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs"
                           >
                             ↓ Download All
                           </button>
 
                           <button
                             onClick={() => removeRecord(record.id)}
-                            className="rounded-lg border border-red-400/20 bg-red-500/10 px-3 py-2 text-xs text-red-300 hover:bg-red-500/20"
+                            className="rounded-lg border border-red-400/20 bg-red-500/10 px-3 py-2 text-xs text-red-300"
                           >
                             Delete
                           </button>
@@ -1193,24 +1109,26 @@ export default function Home() {
                       </div>
 
                       <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        {[
-                          ["Guidance", record.guidance.toFixed(1)],
-                          ["DDIM Steps", String(record.steps)],
-                          ["Seed", String(record.seed)],
-                          ["Inference", `${record.elapsed} s`],
-                        ].map(([label, value]) => (
-                          <div
-                            key={label}
-                            className="rounded-xl border border-white/[0.07] bg-black/20 p-3"
-                          >
-                            <p className="text-[10px] text-slate-500">
-                              {label}
-                            </p>
-                            <p className="mt-1 text-sm font-semibold">
-                              {value}
-                            </p>
-                          </div>
-                        ))}
+                        <StatCard
+                          label="GUIDANCE"
+                          value={record.guidance.toFixed(1)}
+                          description="Guidance scale"
+                        />
+                        <StatCard
+                          label="DDIM STEPS"
+                          value={String(record.steps)}
+                          description="Sampling steps"
+                        />
+                        <StatCard
+                          label="SEED"
+                          value={String(record.seed)}
+                          description="Random seed"
+                        />
+                        <StatCard
+                          label="INFERENCE"
+                          value={`${record.elapsed} s`}
+                          description="Generation time"
+                        />
                       </div>
 
                       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
@@ -1255,7 +1173,7 @@ export default function Home() {
                 <StatCard
                   label="TOTAL GENERATIONS"
                   value={String(history.length)}
-                  description="Saved generation sessions"
+                  description="Saved sessions"
                 />
                 <StatCard
                   label="IMAGES GENERATED"
@@ -1270,7 +1188,7 @@ export default function Home() {
                 <StatCard
                   label="CLASSIFIER MATCH RATE"
                   value={`${matchRate.toFixed(1)}%`}
-                  description={`${totalMatches}/${totalSamples} predictions matched`}
+                  description={`${totalMatches}/${totalImages} predictions matched`}
                 />
               </div>
 
@@ -1300,12 +1218,10 @@ export default function Home() {
                     ].map(([label, value]) => (
                       <div
                         key={label}
-                        className="flex items-center justify-between gap-3 border-b border-white/[0.06] pb-3"
+                        className="flex justify-between gap-3 border-b border-white/[0.06] pb-3"
                       >
-                        <span className="text-sm text-slate-500">
-                          {label}
-                        </span>
-                        <span className="text-right text-sm font-medium text-slate-200">
+                        <span className="text-sm text-slate-500">{label}</span>
+                        <span className="text-right text-sm font-medium">
                           {value}
                         </span>
                       </div>
@@ -1339,9 +1255,9 @@ export default function Home() {
                         Inference Time
                       </h4>
                       <p className="mt-2 text-sm leading-6 text-slate-400">
-                        The time reported by the backend for a generation
-                        request. It can vary with sample count, DDIM steps,
-                        hardware and system load.
+                        Time reported by the backend for generation. It can
+                        vary with sample count, DDIM steps, hardware and system
+                        load.
                       </p>
                     </div>
 
@@ -1352,8 +1268,7 @@ export default function Home() {
                       <p className="mt-2 text-sm leading-6 text-slate-400">
                         Controls how strongly the conditional label influences
                         the sampling process. Its effect should be evaluated
-                        experimentally rather than assuming higher is always
-                        better.
+                        experimentally.
                       </p>
                     </div>
                   </div>
@@ -1364,15 +1279,278 @@ export default function Home() {
                 <h3 className="font-semibold">Your Experiment Activity</h3>
                 <p className="mt-2 text-sm leading-6 text-slate-400">
                   {history.length === 0
-                    ? "No generation activity is available yet. Generate some samples in Studio to start building your activity statistics."
+                    ? "No generation activity is available yet. Generate samples in Studio to start building your activity statistics."
                     : `You have saved ${history.length} generation sessions containing ${totalImages} images. Your average classifier match rate across these saved samples is ${matchRate.toFixed(1)}%.`}
                 </p>
               </div>
             </section>
           )}
 
+          {/* EVALUATION */}
+          {activeTab === "Evaluation" && (
+            <section>
+              <div className="mb-6">
+                <h3 className="text-xl font-semibold">
+                  Diffusion Model Evaluation
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  Generate a batch of samples and evaluate class consistency,
+                  classifier confidence, diversity and inference performance.
+                </p>
+              </div>
+
+              {/* EVALUATION CONTROLS */}
+              <div className="rounded-3xl border border-white/10 bg-[#111522]/80 p-6 sm:p-8">
+                <p className="text-xs tracking-widest text-violet-300">
+                  01 / EXPERIMENT CONFIGURATION
+                </p>
+                <h3 className="mt-2 text-xl font-semibold">
+                  Evaluation Parameters
+                </h3>
+
+                <div className="mt-7 grid grid-cols-1 gap-6 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm text-slate-300">
+                      Target digit
+                    </label>
+                    <select
+                      value={evalDigit}
+                      onChange={(e) => setEvalDigit(Number(e.target.value))}
+                      className="w-full rounded-xl border border-white/10 bg-[#080b14] px-4 py-3 text-sm"
+                    >
+                      {Array.from({ length: 10 }, (_, i) => (
+                        <option key={i} value={i}>
+                          Digit {i}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm text-slate-300">
+                      Number of samples: {evalCount}
+                    </label>
+                    <input
+                      type="range"
+                      min="2"
+                      max="64"
+                      step="1"
+                      value={evalCount}
+                      onChange={(e) => setEvalCount(Number(e.target.value))}
+                      className="w-full accent-violet-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm text-slate-300">
+                      Guidance scale: {evalGuidance.toFixed(1)}
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="3"
+                      step="0.1"
+                      value={evalGuidance}
+                      onChange={(e) =>
+                        setEvalGuidance(Number(e.target.value))
+                      }
+                      className="w-full accent-violet-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm text-slate-300">
+                      DDIM steps: {evalSteps}
+                    </label>
+                    <input
+                      type="range"
+                      min="5"
+                      max="100"
+                      step="5"
+                      value={evalSteps}
+                      onChange={(e) => setEvalSteps(Number(e.target.value))}
+                      className="w-full accent-violet-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm text-slate-300">
+                      Random seed
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="2147483647"
+                      value={evalSeed}
+                      onChange={(e) =>
+                        setEvalSeed(
+                          Math.max(
+                            0,
+                            Math.min(2147483647, Number(e.target.value) || 0)
+                          )
+                        )
+                      }
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  onClick={runEvaluation}
+                  disabled={evaluationLoading || backendOnline !== true}
+                  className="mt-8 w-full rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 py-4 font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {evaluationLoading
+                    ? "◌ Evaluating model..."
+                    : backendOnline !== true
+                      ? "Backend Unavailable"
+                      : "✦ Run Model Evaluation"}
+                </button>
+
+                {evaluationError && (
+                  <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">
+                    {evaluationError}
+                  </div>
+                )}
+              </div>
+
+              {/* EVALUATION RESULTS */}
+              {evaluation && (
+                <div className="mt-8 space-y-6">
+                  <div>
+                    <p className="text-xs tracking-widest text-cyan-300">
+                      02 / EVALUATION RESULTS
+                    </p>
+                    <h3 className="mt-2 text-2xl font-semibold">
+                      Performance Overview
+                    </h3>
+                    <p className="mt-2 text-sm text-slate-400">
+                      Evaluation for digit {evaluation.params.digit} using{" "}
+                      {evaluation.params.count} generated samples.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    <StatCard
+                      label="CLASS CONSISTENCY"
+                      value={`${evaluation.class_consistency.toFixed(1)}%`}
+                      description={`${evaluation.matches}/${evaluation.items.length} classifier matches`}
+                    />
+                    <StatCard
+                      label="MEAN CONFIDENCE"
+                      value={`${(evaluation.mean_confidence * 100).toFixed(2)}%`}
+                      description="Average classifier confidence"
+                    />
+                    <StatCard
+                      label="DIVERSITY SCORE"
+                      value={evaluation.diversity_mean_pairwise_l1.toFixed(4)}
+                      description="Mean pairwise pixel L1 distance"
+                    />
+                    <StatCard
+                      label="PIXEL VARIATION"
+                      value={evaluation.mean_pixel_std.toFixed(4)}
+                      description="Mean pixel standard deviation"
+                    />
+                    <StatCard
+                      label="INFERENCE TIME"
+                      value={`${evaluation.seconds.toFixed(2)} s`}
+                      description="Total evaluation time"
+                    />
+                    <StatCard
+                      label="THROUGHPUT"
+                      value={`${evaluation.images_per_second.toFixed(2)}`}
+                      description="Images generated per second"
+                    />
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-[#111522]/80 p-5">
+                    <h4 className="font-semibold">Evaluation Configuration</h4>
+                    <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-5">
+                      {[
+                        ["Digit", evaluation.params.digit],
+                        ["Samples", evaluation.params.count],
+                        ["Guidance", evaluation.params.w],
+                        ["DDIM Steps", evaluation.params.steps],
+                        ["Seed", evaluation.params.seed],
+                      ].map(([label, value]) => (
+                        <div
+                          key={String(label)}
+                          className="rounded-xl border border-white/[0.07] bg-black/20 p-3"
+                        >
+                          <p className="text-xs text-slate-500">{label}</p>
+                          <p className="mt-1 font-semibold">{value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-3xl border border-white/10 bg-[#111522]/80 p-6">
+                    <h4 className="text-lg font-semibold">
+                      Generated Evaluation Samples
+                    </h4>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Green border indicates the classifier predicted the
+                      requested digit. Red border indicates a mismatch.
+                    </p>
+
+                    <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+                      {evaluation.items.map((item, index) => (
+                        <ImageCard
+                          key={`evaluation-${index}`}
+                          item={item}
+                          index={index}
+                          selectedDigit={evaluation.params.digit}
+                          onDownload={() =>
+                            downloadImage(
+                              item.image,
+                              `evaluation-digit-${evaluation.params.digit}-${index + 1}.png`
+                            )
+                          }
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-violet-400/20 bg-violet-500/[0.06] p-5">
+                    <h4 className="font-semibold">How to interpret results</h4>
+                    <div className="mt-3 space-y-3 text-sm leading-6 text-slate-400">
+                      <p>
+                        <strong className="text-emerald-300">
+                          Class consistency:
+                        </strong>{" "}
+                        Percentage of samples classified as the requested
+                        digit by the separate CNN classifier.
+                      </p>
+                      <p>
+                        <strong className="text-violet-300">
+                          Mean confidence:
+                        </strong>{" "}
+                        Average confidence reported by that classifier. It
+                        does not directly measure generator accuracy.
+                      </p>
+                      <p>
+                        <strong className="text-cyan-300">
+                          Diversity:
+                        </strong>{" "}
+                        Mean pairwise pixel-space L1 distance. It is a simple
+                        diversity indicator, not a perceptual metric or FID.
+                      </p>
+                      <p>
+                        <strong className="text-violet-300">
+                          Throughput:
+                        </strong>{" "}
+                        Number of images generated per second during this
+                        evaluation run.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
           {/* FOOTER */}
-          <footer className="mt-8 border-t border-white/[0.07] py-6 text-xs text-slate-600">
+          <footer className="mt-10 border-t border-white/[0.07] py-6 text-xs text-slate-600">
             DiffusionLab · PyTorch + FastAPI + Next.js
           </footer>
         </section>
