@@ -127,6 +127,21 @@ Needs `checkpoints/cond_ema.pt` (train it first, weights are not in the repo).
 
 ---
 
+### DiffusionLab frontend (Next.js)
+
+A Next.js interface (`frontend/`) for the same model: Studio (generate), guidance comparison, a local history of generations, model insights and a small evaluation panel. It needs the backend running on port 8000:
+
+```
+# terminal 1 (project folder, venv active)
+python -m uvicorn server2:app --host 127.0.0.1 --port 8000
+
+# terminal 2
+cd frontend
+npm install
+npm run dev
+# open http://localhost:3000
+```
+
 ## Results
 
 All numbers below are for **32x32 images, `BASE_CH = 64`, 30 epochs, trained on a Colab T4**, unless stated otherwise.
@@ -357,6 +372,7 @@ diffusion-mnist/
 ├── server.py           # FastAPI backend (full-stack demo)
 ├── server2.py          # FastAPI backend v2 (classifier verdict and guidance comparison)
 ├── static/             # web interfaces (index.html, index2.html)
+├── frontend/           # Next.js interface (DiffusionLab)
 ├── compare.py          # EMA vs no-EMA figure
 ├── compare_ddim.py     # DDPM vs DDIM figure
 ├── check_setup.py      # environment check
