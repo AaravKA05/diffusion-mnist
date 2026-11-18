@@ -67,6 +67,7 @@ app.add_middleware(
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "https://diffusion-mnist.vercel.app",
+        "https://diffusion-mnist-ah3vhn8js-aaravka05.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
