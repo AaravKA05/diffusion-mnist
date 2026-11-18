@@ -17,6 +17,7 @@ I built this to understand the core idea behind Stable Diffusion and Midjourney,
 - Classifier-based evaluation of generated digits
 - Denoising GIF and a Gradio live demo
 - Full-stack demo: FastAPI backend with a web interface
+- **DiffusionLab:** Next.js frontend on Vercel with a serverless FastAPI inference backend on Modal
 
 **Final results use 32x32 images, trained on a free Colab T4 GPU.** Earlier 16x16 runs on a laptop CPU are kept as a side note at the end of the Results section.
 
@@ -72,7 +73,9 @@ Tested with Python 3.13 and PyTorch 2.15 (CPU build).
 
 **Image size.** `config.py` holds `IMG_SIZE` and `BASE_CH`. The final results use `IMG_SIZE = 32` and `BASE_CH = 64`. For a quick run on a laptop CPU, use `IMG_SIZE = 16` and `BASE_CH = 32`.
 
-**Weights are not in this repo** (`*.pt` is git-ignored). To get a working model, train it yourself with the commands below. The 32x32 models took about 30 minutes each on a Colab T4.
+**Pretrained inference checkpoints are included in `checkpoints/`:** `cond_ema.pt` (conditional diffusion model) and `classifier.pt` (evaluation classifier). These are the two files used by the deployed `server2.py` inference API. To reproduce training from scratch, follow the training commands below; the 32x32 models took about 30 minutes each on a Colab T4.
+
+Other local checkpoint files remain ignored by Git unless explicitly added.
 
 ---
 
@@ -111,6 +114,8 @@ All settings (image size, `T`, learning rate, epochs, EMA decay) live in `config
 
 A FastAPI backend loads the conditional model once and serves `POST /api/generate` (digit, count, guidance `w`, DDIM steps, seed). A single-page web interface in `static/index.html` calls it and shows the generated digits, the denoising GIF and the guidance sweep plot. Auto-generated API docs are at `/docs`.
 
+The newer `server2.py` API also provides classifier verdicts, guidance comparison and evaluation endpoints. The deployed DiffusionLab frontend uses this version.
+
 ```
 pip install -r requirements.txt
 uvicorn server:app --port 8000
@@ -123,13 +128,21 @@ A second version (`server2.py` with `static/index2.html`, run with `uvicorn serv
 
 [![Web demo v2](results/web_demo2.png)](results/web_demo2.png)
 
-Needs `checkpoints/cond_ema.pt` (train it first, weights are not in the repo).
+Needs `checkpoints/cond_ema.pt` and `checkpoints/classifier.pt`.
 
 ---
 
 ### DiffusionLab frontend (Next.js)
 
-A Next.js interface (`frontend/`) for the same model: Studio (generate), guidance comparison, a local history of generations, model insights and a small evaluation panel. It needs the backend running on port 8000:
+A Next.js interface (`frontend/`) for the same model: Studio (generate), guidance comparison, a local history of generations, model insights and a small evaluation panel.
+
+**Live website:** [https://diffusion-mnist.vercel.app/](https://diffusion-mnist.vercel.app/)
+
+The production frontend is hosted on Vercel. Its `NEXT_PUBLIC_API_URL` points to the Modal FastAPI endpoint:
+
+`https://aaravka05--diffusionlab-api-fastapi-app.us-east.modal.run`
+
+For local development, run the backend and frontend separately:
 
 ```
 # terminal 1 (project folder, venv active)
@@ -141,6 +154,42 @@ npm install
 npm run dev
 # open http://localhost:3000
 ```
+
+### Production deployment (Vercel + Modal)
+
+The public website uses two services:
+
+| Component | Platform | Purpose |
+| --- | --- | --- |
+| Next.js frontend | Vercel | Serves the user interface |
+| FastAPI inference API | Modal | Loads trained checkpoints and runs generation/evaluation |
+
+**Deploy the backend** from the project root, with the virtual environment active and Modal CLI authenticated:
+
+```bash
+modal deploy modal_app.py
+```
+
+Modal uploads the application code, required Python modules, static assets and `checkpoints/`, then prints the deployed web endpoint. The endpoint currently configured in the frontend is:
+
+`https://aaravka05--diffusionlab-api-fastapi-app.us-east.modal.run`
+
+The API provides:
+
+- `GET /api/info` — backend status and model information
+- `POST /api/generate` — class-conditional digit generation
+- `POST /api/compare` — guidance comparison
+- `POST /api/evaluate` — evaluation results
+
+**Deploy the frontend** from the `frontend/` directory through Vercel. Set this environment variable for Preview and Production:
+
+```env
+NEXT_PUBLIC_API_URL=https://aaravka05--diffusionlab-api-fastapi-app.us-east.modal.run
+```
+
+Redeploy Vercel after changing the variable so the new value is included in the frontend build.
+
+**Hosting note:** Modal is usage-based serverless hosting. Included credits and account limits determine how long the backend can run without additional charges. The frontend can load while the backend is waking up; generation requires the Modal API to be reachable.
 
 ## Results
 
@@ -373,6 +422,8 @@ diffusion-mnist/
 ├── server2.py          # FastAPI backend v2 (classifier verdict and guidance comparison)
 ├── static/             # web interfaces (index.html, index2.html)
 ├── frontend/           # Next.js interface (DiffusionLab)
+├── modal_app.py        # Modal deployment wrapper for FastAPI
+├── requirements-render.txt # lightweight requirements for earlier Render setup
 ├── compare.py          # EMA vs no-EMA figure
 ├── compare_ddim.py     # DDPM vs DDIM figure
 ├── check_setup.py      # environment check
@@ -384,7 +435,9 @@ diffusion-mnist/
 ├── requirements.txt
 ├── notebooks/
 ├── results/            # figures and loss histories
-└── checkpoints/        # saved weights (git-ignored)
+└── checkpoints/
+    ├── cond_ema.pt     # conditional diffusion model checkpoint
+    └── classifier.pt   # evaluation classifier checkpoint
 ```
 
 ---
