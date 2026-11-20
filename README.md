@@ -7,6 +7,8 @@ It learns to remove noise, then turns pure static into brand-new handwritten dig
 
 I built this to understand the core idea behind Stable Diffusion and Midjourney, scaled down to MNIST. Everything (noise schedule, U-Net, training loop, samplers) is written by hand.
 
+**Live demo:** [diffusion-mnist.vercel.app](https://diffusion-mnist.vercel.app/) (Next.js frontend on Vercel, FastAPI + PyTorch backend on Modal, CPU). The first request after a quiet period can be slow while the backend wakes up; I have not measured that start-up time.
+
 **Features**
 
 - U-Net with sinusoidal time embeddings
@@ -18,6 +20,7 @@ I built this to understand the core idea behind Stable Diffusion and Midjourney,
 - Denoising GIF and a Gradio live demo
 - Full-stack demo: FastAPI backend with a web interface
 - **DiffusionLab:** Next.js frontend on Vercel with a serverless FastAPI inference backend on Modal
+- VAE baseline, nearest-neighbour copy check and a per-digit diagnosis
 
 **Final results use 32x32 images, trained on a free Colab T4 GPU.** Earlier 16x16 runs on a laptop CPU are kept as a side note at the end of the Results section.
 
@@ -30,9 +33,10 @@ I built this to understand the core idea behind Stable Diffusion and Midjourney,
 3. [Usage](#usage)
 4. [Full-stack demo](#full-stack-demo)
 5. [Results](#results)
-6. [What went wrong](#what-went-wrong)
-7. [Project structure](#project-structure)
-8. [References](#references)
+6. [Limits and what I do not claim](#limits-and-what-i-do-not-claim)
+7. [What went wrong](#what-went-wrong)
+8. [Project structure](#project-structure)
+9. [References](#references)
 
 ---
 
@@ -103,8 +107,10 @@ Other local checkpoint files remain ignored by Git unless explicitly added.
 | `python guidance_seeds.py`           | Repeat the `w = 1.0` against `w = 1.2` comparison over 3 seeds (about 1 hour on a laptop CPU)  |
 | `python plot_diagnose.py`            | Figures from `results/diagnose.json` (counts, per-digit accuracy, confusion matrices)         |
 | `python nn_check.py`                 | Check whether generated digits are copies of training images (nearest-neighbour distance)     |
+| `python preflight.py`                | Check files, packages and ports before a local demo                                            |
 | `uvicorn server:app --port 8000`     | Full-stack demo (FastAPI backend + web page at [http://localhost:8000](http://localhost:8000)) |
 | `uvicorn server2:app --port 8001`    | Second version of the web demo: classifier verdict under every digit and a guidance comparison  |
+| `modal deploy modal_app.py`          | Deploy the FastAPI backend to Modal (needs a Modal account and the Modal CLI logged in)        |
 
 All settings (image size, `T`, learning rate, epochs, EMA decay) live in `config.py`.
 
@@ -134,7 +140,7 @@ Needs `checkpoints/cond_ema.pt` and `checkpoints/classifier.pt`.
 
 ### DiffusionLab frontend (Next.js)
 
-A Next.js interface (`frontend/`) for the same model: Studio (generate), guidance comparison, a local history of generations, model insights and a small evaluation panel.
+A Next.js interface (`frontend/`) for the same model: Studio (generate), guidance comparison, a local history of generations (stored in the browser, no database and no login), model insights and a small evaluation panel. Screenshots of the deployed app are in Results section 12.
 
 **Live website:** [https://diffusion-mnist.vercel.app/](https://diffusion-mnist.vercel.app/)
 
@@ -189,7 +195,9 @@ NEXT_PUBLIC_API_URL=https://aaravka05--diffusionlab-api-fastapi-app.us-east.moda
 
 Redeploy Vercel after changing the variable so the new value is included in the frontend build.
 
-**Hosting note:** Modal is usage-based serverless hosting. Included credits and account limits determine how long the backend can run without additional charges. The frontend can load while the backend is waking up; generation requires the Modal API to be reachable.
+**Hosting note:** Modal is usage-based serverless hosting. Included credits and account limits determine how long the backend can run without additional charges. The frontend can load while the backend is waking up; generation requires the Modal API to be reachable. The backend runs on CPU. The first request after a quiet period may be slow, and I have not measured how slow. The API is public and has no login or rate limit.
+
+---
 
 ## Results
 
@@ -329,7 +337,7 @@ Measured on the laptop CPU, approximate: the "Done in" time reported by the Fast
 | 1.2          | 4.6 s               |
 | 2            | 4.32 s              |
 
-A stopwatch in the Gradio demo gave about 4.9 s for 20 steps and about 12 s for 50 steps (the number of images in that run was not recorded). For `w` other than 1.0 the model runs twice per step (conditional and unconditional), so `w` barely changes the time.
+A stopwatch in the Gradio demo gave about 4.9 s for 20 steps and about 12 s for 50 steps (the number of images in that run was not recorded). In a later session the second web demo showed 2.07 s for Generate and 6.08 s for Compare (three sets of 8); I did not investigate why the times differ between sessions. For `w` other than 1.0 the model runs twice per step (conditional and unconditional), so `w` barely changes the time.
 
 ### 9. Diagnosis of two open questions (`diagnose.py`)
 
@@ -369,6 +377,20 @@ The classifier is more confident about the diffusion samples. The VAE is far fas
 
 Top row: generated digits. Bottom row: the nearest training image of each. There is no sign that the model copies training images. This does not prove that the digits are good new samples: only 100 samples, one model and one `w` were checked, and pixel distance is a crude measure.
 
+### 12. Deployed demo (Vercel + Modal, CPU)
+
+These numbers come from the live website. Settings for all three runs: digit 7, DDIM 20 steps, seed 42, 4 samples, guidance 1.2 (the comparison uses `w` = 0, 1.2 and 2). I did not control whether the backend was already awake, and each number is a single run.
+
+| Run | Result |
+| --- | --- |
+| Studio, Generate | 4 of 4 samples read as 7 (confidence 99.8%, 99.6%, 99.9%, 93.9%); inference time 1.67 s |
+| Compare, `w = 0` | 0 of 4 (read as 2, 3, 8, 0) |
+| Compare, `w = 1.2` | 4 of 4 |
+| Compare, `w = 2` | 0 of 4 (read as 1, 3, 8, 0); total Compare time 5.04 s |
+| Evaluation tab | class consistency 100%, mean confidence 98.32%, diversity score 0.2706 (mean pairwise pixel L1 distance), pixel variation 0.2397, 1.72 s, 2.32 images per second |
+
+These are runs with only 4 samples. They show the same behaviour as the guidance results in section 7 (`w = 0` and `w = 2` mostly miss the digit, `w = 1.2` hits it) but they are not additional evidence. The diversity score is a simple indicator, not a perceptual metric or FID.
+
 ### Side note: earlier 16x16 runs on laptop CPU
 
 Before moving to Colab I trained 16x16 models (`BASE_CH = 32`) on a laptop CPU.
@@ -377,6 +399,17 @@ Before moving to Colab I trained 16x16 models (`BASE_CH = 32`) on a laptop CPU.
 - Sampling 64 images on CPU: DDPM 400 steps 9.2 s, DDIM 50 steps 1.2 s, DDIM 20 steps 0.5 s, DDIM 10 steps 0.3 s.
 - Classifier test accuracy 98.1%. Guidance sweep peaked at 93.7% at `w = 1.2` (89.5% at `w = 1.0`).
 - The classifiers differ between 16x16 and 32x32, so I do not claim that one resolution is better than the other from these numbers.
+
+---
+
+## Limits and what I do not claim
+
+- No FID or other standard image-quality metric: a small classifier is used as a rough check.
+- Not a production service and not real-time: the deployed backend runs on CPU, and its cold-start time is not measured.
+- No claim that diffusion beats VAEs or GANs in general; the VAE here is small and untuned.
+- No significance claim for the guidance gain (3 seeds, one classifier).
+- No explanation for the rare digit 1 or for the failure at `w = 3.0`; both are open questions.
+- The public API has no login or rate limit.
 
 ---
 
@@ -399,6 +432,7 @@ Before moving to Colab I trained 16x16 models (`BASE_CH = 32`) on a laptop CPU.
 | `requirements.txt` problems             | It was saved as UTF-16 by a PowerShell redirect and did not list gradio although `app.py` imports it                                   | Save as UTF-8, check every import against the file                                                      |
 | Broken README layout                    | A missing closing code fence made the rest of the page appear inside a grey box on GitHub                                              | Preview the README on GitHub after every structural edit                                                |
 | Screenshot saved in the wrong place     | Saving from the Snipping Tool created `results/results/` and a file named `resultsweb_demo.png.png`                                    | Type the full path in the save dialog, check names with `dir`                                           |
+| Gradio share link failed                | The tunnel client download was blocked by the antivirus (found only because `Get-FileHash` reported a virus warning)                   | Add a folder exception for that one folder, check the hash against Gradio's checksum, remove it later   |
 
 ---
 
@@ -432,6 +466,7 @@ diffusion-mnist/
 ├── plot_diagnose.py    # figures from diagnose.json
 ├── guidance_seeds.py   # guidance comparison repeated over seeds
 ├── nn_check.py         # nearest-neighbour check for copying
+├── preflight.py        # pre-demo check (files, packages, ports)
 ├── requirements.txt
 ├── notebooks/
 ├── results/            # figures and loss histories
@@ -450,6 +485,7 @@ diffusion-mnist/
 - Song, Meng, Ermon (2021), [*Denoising Diffusion Implicit Models*](https://arxiv.org/abs/2010.02502)
 - Ho and Salimans (2022), [*Classifier-Free Diffusion Guidance*](https://arxiv.org/abs/2207.12598)
 - Nichol and Dhariwal (2021), [*Improved Denoising Diffusion Probabilistic Models*](https://arxiv.org/abs/2102.09672)
+- Kingma and Welling (2013), [*Auto-Encoding Variational Bayes*](https://arxiv.org/abs/1312.6114)
 
 **Dataset**
 
