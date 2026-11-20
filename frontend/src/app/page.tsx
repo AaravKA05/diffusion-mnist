@@ -31,6 +31,20 @@ type GenerationRecord = {
   items: GeneratedItem[];
 };
 
+type ExperimentRecord = {
+  id: string;
+  createdAt: string;
+  experimentType: string;
+  digit: number;
+  count: number;
+  values: number[];
+  guidance: number;
+  steps: number;
+  seed: number;
+  totalSeconds: number;
+  results: any[];
+};
+
 type VisualizationFrame = {
   timestep: number;
   image: string;
@@ -65,12 +79,17 @@ type EvaluationResult = {
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
+    const request = indexedDB.open(DB_NAME, 2);
 
     request.onupgradeneeded = () => {
       const db = request.result;
+
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME, { keyPath: "id" });
+      }
+
+      if (!db.objectStoreNames.contains("experiments")) {
+        db.createObjectStore("experiments", { keyPath: "id" });
       }
     };
 
@@ -114,6 +133,50 @@ async function getGenerations(): Promise<GenerationRecord[]> {
       );
       db.close();
       resolve(records);
+    };
+
+    request.onerror = () => {
+      db.close();
+      reject(request.error);
+    };
+  });
+}
+
+async function saveExperiment(record: ExperimentRecord) {
+  const db = await openDatabase();
+
+  return new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction("experiments", "readwrite");
+    transaction.objectStore("experiments").put(record);
+
+    transaction.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+
+    transaction.onerror = () => {
+      db.close();
+      reject(transaction.error);
+    };
+  });
+}
+
+async function getExperiments(): Promise<ExperimentRecord[]> {
+  const db = await openDatabase();
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction("experiments", "readonly");
+    const request = transaction.objectStore("experiments").getAll();
+
+    request.onsuccess = () => {
+      db.close();
+      resolve(
+        (request.result as ExperimentRecord[]).sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() -
+            new Date(a.createdAt).getTime()
+        )
+      );
     };
 
     request.onerror = () => {
@@ -260,6 +323,14 @@ export default function Home() {
   const [compareTime, setCompareTime] = useState<number | null>(null);
   const [compareLoading, setCompareLoading] = useState(false);
 
+  const [experimentType, setExperimentType] = useState("guidance");
+  const [savedExperiments, setSavedExperiments] = useState<ExperimentRecord[]>([]);
+  const [experimentValues, setExperimentValues] = useState("0, 1.2, 2");
+  const [experimentResults, setExperimentResults] = useState<any[]>([]);
+  const [experimentTime, setExperimentTime] = useState<number | null>(null);
+  const [experimentLoading, setExperimentLoading] = useState(false);
+  const [experimentError, setExperimentError] = useState("");
+
   const [history, setHistory] = useState<GenerationRecord[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState("");
@@ -326,10 +397,16 @@ export default function Home() {
     async function loadHistory() {
       try {
         const records = await getGenerations();
-        if (mounted) setHistory(records);
+        const experiments = await getExperiments();
+
+        if (mounted) {
+          setHistory(records);
+          setSavedExperiments(experiments);
+        }
       } catch {
         if (mounted) {
-          setHistoryError("Could not load saved generations.");
+          setHistoryError("Could not load saved history.");
+          setHistoryError("Could not load saved generations and experiments.");
         }
       } finally {
         if (mounted) setHistoryLoading(false);
@@ -478,6 +555,131 @@ export default function Home() {
     } finally {
       setCompareLoading(false);
     }
+  }
+
+  async function runExperiment() {
+    setExperimentLoading(true);
+    setExperimentError("");
+    setExperimentResults([]);
+    setExperimentTime(null);
+
+    try {
+      const values = experimentValues
+        .split(",")
+        .map((value) => Number(value.trim()));
+
+      if (
+        values.length < 2 ||
+        values.length > 4 ||
+        values.some((value) => !Number.isFinite(value))
+      ) {
+        throw new Error("Enter 2 to 4 valid comma-separated values.");
+      }
+
+      const response = await fetch(`${API}/api/experiment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          experiment_type: experimentType,
+          digit,
+          count: Math.min(count, 8),
+          values,
+          w: guidance,
+          steps,
+          seed,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Experiment failed.");
+      }
+
+      setExperimentResults(data.results);
+      setExperimentTime(data.total_seconds);
+      setStatus("Experiment completed successfully.");
+    } catch (err) {
+      setExperimentError(
+        err instanceof Error ? err.message : "Unable to run experiment."
+      );
+    } finally {
+      setExperimentLoading(false);
+    }
+  }
+
+  async function saveCurrentExperiment() {
+    if (experimentResults.length === 0) return;
+
+    try {
+      const record: ExperimentRecord = {
+        id: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        experimentType,
+        digit,
+        count: Math.min(count, 8),
+        values: experimentValues
+          .split(",")
+          .map((value) => Number(value.trim())),
+        guidance,
+        steps,
+        seed,
+        totalSeconds: experimentTime ?? 0,
+        results: experimentResults,
+      };
+
+      await saveExperiment(record);
+
+      setSavedExperiments((current) => [record, ...current]);
+      setStatus("Experiment saved to history.");
+    } catch (err) {
+      setExperimentError(
+        err instanceof Error ? err.message : "Could not save experiment."
+      );
+    }
+  }
+
+  function exportExperimentCSV() {
+    if (experimentResults.length === 0) return;
+
+    const headers = [
+      "Experiment Type",
+      "Target Digit",
+      "Parameter",
+      "Value",
+      "Matches",
+      "Match Rate (%)",
+      "Average Confidence",
+      "Inference Time (s)",
+    ];
+
+    const rows = experimentResults.map((result: any) => [
+      experimentType,
+      digit,
+      result.parameter,
+      result.value,
+      result.matches,
+      result.match_rate,
+      result.avg_confidence,
+      result.seconds,
+    ]);
+
+    const csv = [headers, ...rows]
+      .map((row) => row.join(","))
+      .join("\n");
+
+    const blob = new Blob([csv], {
+      type: "text/csv;charset=utf-8;",
+    });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `experiment-${experimentType}-results.csv`;
+    link.click();
+
+    URL.revokeObjectURL(url);
   }
 
   async function runVisualization() {
@@ -664,6 +866,7 @@ export default function Home() {
     ["◎", "Evaluation"],
     ["◌", "Denoising Visualizer"],
     ["◈", "Noise Interpolation"],
+    ["⚗", "Experiment Lab"],
   ];
 
   return (
@@ -768,7 +971,9 @@ export default function Home() {
                         ? "Denoising Visualizer"
                         : activeTab === "Noise Interpolation"
                           ? "Noise Interpolation"
-                          : "Model Insights"}
+                          : activeTab === "Experiment Lab"
+                            ? "Experiment Lab"
+                            : "Model Insights"}
                 <span className="text-violet-400">.</span>
               </h2>
               <p className="mt-2 text-sm text-slate-500">
@@ -782,7 +987,9 @@ export default function Home() {
                         ? "Watch a noisy image progressively become a generated digit."
                         : activeTab === "Noise Interpolation"
                           ? "Explore smooth transitions between two random noise inputs."
-                          : "A summary of your generation activity and model configuration."}
+                          : activeTab === "Experiment Lab"
+                            ? "Run controlled experiments to understand how diffusion parameters affect generated images."
+                            : "A summary of your generation activity and model configuration."}
               </p>
             </div>
 
@@ -1779,6 +1986,518 @@ export default function Home() {
                 )}
               </section>
             </>
+          )}
+
+          {activeTab === "Experiment Lab" && (
+            <section className="space-y-6">
+              <div className="rounded-3xl border border-violet-400/20 bg-[#111522]/80 p-6 sm:p-8">
+                <p className="text-xs tracking-widest text-violet-300">
+                  CONTROLLED DIFFUSION EXPERIMENTS
+                </p>
+                <h3 className="mt-2 text-2xl font-semibold">
+                  Experiment Configuration
+                </h3>
+                <p className="mt-2 text-sm text-slate-400">
+                  Compare how different diffusion parameters affect generated digits.
+                </p>
+
+                <div className="mt-6 grid gap-5 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm text-slate-300">
+                      Experiment Type
+                    </label>
+                    <select
+                      value={experimentType}
+                      onChange={(e) => {
+                        setExperimentType(e.target.value);
+                        setExperimentValues(
+                          e.target.value === "guidance"
+                            ? "0, 1.2, 2"
+                            : e.target.value === "steps"
+                              ? "10, 20, 50"
+                              : "42, 123, 456"
+                        );
+                        setExperimentResults([]);
+                      }}
+                      className="w-full rounded-xl border border-white/10 bg-[#080b14] p-3 text-white"
+                    >
+                      <option value="guidance">CFG Guidance Scale</option>
+                      <option value="steps">DDIM Sampling Steps</option>
+                      <option value="seeds">Random Seeds</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm text-slate-300">
+                      Target Digit (0–9)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="9"
+                      value={digit}
+                      onChange={(e) => setDigit(Number(e.target.value))}
+                      className="w-full rounded-xl border border-white/10 bg-[#080b14] p-3 text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm text-slate-300">
+                      Samples per Configuration (1–8)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="8"
+                      value={count}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setCount(value === "" ? ("" as any) : Number(value));
+                      }}
+                      onBlur={() => {
+                        setCount((current) =>
+                          Math.min(8, Math.max(1, Number(current) || 1))
+                        );
+                      }}
+                      className="w-full rounded-xl border border-white/10 bg-[#080b14] p-3 text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm text-slate-300">
+                      Comparison Values (comma separated)
+                    </label>
+                    <input
+                      type="text"
+                      value={experimentValues}
+                      onChange={(e) => setExperimentValues(e.target.value)}
+                      placeholder="0, 1.2, 2"
+                      className="w-full rounded-xl border border-white/10 bg-[#080b14] p-3 text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm text-slate-300">
+                      Guidance Scale
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="3"
+                      step="0.1"
+                      value={guidance}
+                      onChange={(e) => setGuidance(Number(e.target.value))}
+                      disabled={experimentType === "guidance"}
+                      className="w-full rounded-xl border border-white/10 bg-[#080b14] p-3 text-white disabled:opacity-40"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm text-slate-300">
+                      Sampling Steps
+                    </label>
+                    <input
+                      type="number"
+                      min="5"
+                      max="100"
+                      value={steps}
+                      onChange={(e) => setSteps(Number(e.target.value))}
+                      disabled={experimentType === "steps"}
+                      className="w-full rounded-xl border border-white/10 bg-[#080b14] p-3 text-white disabled:opacity-40"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm text-slate-300">
+                      Starting Seed
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={seed}
+                      onChange={(e) => setSeed(Number(e.target.value))}
+                      disabled={experimentType === "seeds"}
+                      className="w-full rounded-xl border border-white/10 bg-[#080b14] p-3 text-white disabled:opacity-40"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  onClick={runExperiment}
+                  disabled={experimentLoading || backendOnline !== true}
+                  className="mt-7 w-full rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 py-4 font-semibold disabled:opacity-50"
+                >
+                  {experimentLoading
+                    ? "Running Experiment..."
+                    : "Run Experiment"}
+                </button>
+
+                {experimentError && (
+                  <p className="mt-4 rounded-xl bg-red-500/10 p-3 text-sm text-red-300">
+                    {experimentError}
+                  </p>
+                )}
+
+                {experimentLoading && (
+                  <p className="mt-4 text-center text-sm text-violet-300">
+                    Generating comparison samples...
+                  </p>
+                )}
+              </div>
+
+              {experimentResults.length > 0 && (
+                <div className="space-y-6">
+
+                  <div className="flex justify-end">
+                    <button
+                      onClick={exportExperimentCSV}
+                      className="rounded-xl border border-violet-400/30 bg-violet-500/10 px-5 py-3 text-sm font-medium text-violet-200 hover:bg-violet-500/20"
+                    >
+                      Download Results CSV
+                    </button>
+                    <button
+                      onClick={saveCurrentExperiment}
+                      disabled={experimentResults.length === 0 || experimentLoading}
+                      className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Save Experiment
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+
+                    <StatCard
+                      label="CONFIGURATIONS"
+                      value={String(experimentResults.length)}
+                      description="Compared settings"
+                    />
+                    <StatCard
+                      label="TOTAL TIME"
+                      value={`${experimentTime} s`}
+                      description="Experiment duration"
+                    />
+                    <StatCard
+                      label="BEST MATCH RATE"
+                      value={`${Math.max(...experimentResults.map((r: any) => r.match_rate))}%`}
+                      description="Classifier consistency"
+                    />
+                    <StatCard
+                      label="BEST CONFIDENCE"
+                      value={Math.max(...experimentResults.map((r: any) => r.avg_confidence)).toFixed(3)}
+                      description="Average classifier confidence"
+                    />
+                  </div>
+
+                  {(() => {
+                    const best = [...experimentResults].sort(
+                      (a: any, b: any) =>
+                        b.match_rate - a.match_rate ||
+                        b.avg_confidence - a.avg_confidence ||
+                        a.seconds - b.seconds
+                    )[0];
+
+                    return (
+                      <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/[0.06] p-5">
+                        <p className="text-xs font-semibold tracking-widest text-emerald-300">
+                          EXPERIMENT RECOMMENDATION
+                        </p>
+
+                        <h4 className="mt-2 text-xl font-semibold">
+                          Recommended: {best.parameter} = {best.value}
+                        </h4>
+
+                        <p className="mt-2 text-sm text-slate-400">
+                          Selected using match rate first, classifier confidence second,
+                          and inference time as a tie-breaker.
+                        </p>
+
+                        <div className="mt-4 grid grid-cols-3 gap-3">
+                          <StatCard
+                            label="MATCH RATE"
+                            value={`${best.match_rate}%`}
+                            description="Classifier consistency"
+                          />
+                          <StatCard
+                            label="CONFIDENCE"
+                            value={best.avg_confidence.toFixed(3)}
+                            description="Average confidence"
+                          />
+                          <StatCard
+                            label="TIME"
+                            value={`${best.seconds} s`}
+                            description="Inference time"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  <div className="grid gap-5 lg:grid-cols-2">
+                    {/* Match Rate Chart */}
+                    <div className="rounded-2xl border border-white/10 bg-[#111522]/80 p-5">
+                      <h4 className="mb-5 font-semibold">Match Rate Comparison</h4>
+
+                      <div className="space-y-5">
+                        {experimentResults.map((result: any, index: number) => (
+                          <div key={index}>
+                            <div className="mb-2 flex justify-between text-sm">
+                              <span className="text-slate-300">
+                                {result.parameter} = {result.value}
+                              </span>
+                              <span className="font-semibold text-emerald-400">
+                                {result.match_rate}%
+                              </span>
+                            </div>
+                            <div className="h-3 overflow-hidden rounded-full bg-white/10">
+                              <div
+                                className="h-full rounded-full bg-gradient-to-r from-blue-500 to-violet-500 transition-all"
+                                style={{ width: `${result.match_rate}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Inference Time Chart */}
+                    <div className="rounded-2xl border border-white/10 bg-[#111522]/80 p-5">
+                      <h4 className="mb-5 font-semibold">Inference Time Comparison</h4>
+
+                      <div className="space-y-5">
+                        {experimentResults.map((result: any, index: number) => {
+                          const maxTime = Math.max(
+                            ...experimentResults.map((item: any) => item.seconds),
+                            0.01
+                          );
+
+                          return (
+                            <div key={index}>
+                              <div className="mb-2 flex justify-between text-sm">
+                                <span className="text-slate-300">
+                                  {result.parameter} = {result.value}
+                                </span>
+                                <span className="font-semibold text-violet-300">
+                                  {result.seconds} s
+                                </span>
+                              </div>
+                              <div className="h-3 overflow-hidden rounded-full bg-white/10">
+                                <div
+                                  className="h-full rounded-full bg-gradient-to-r from-violet-500 to-pink-500 transition-all"
+                                  style={{ width: `${(result.seconds / maxTime) * 100}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {experimentResults.map((result: any, index: number) => (
+                    <div
+                      key={index}
+                      className="rounded-2xl border border-white/10 bg-[#111522]/80 p-5"
+                    >
+                      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                        <h4 className="text-lg font-semibold">
+                          {result.parameter} = {result.value}
+                        </h4>
+                        <span className="text-sm text-emerald-400">
+                          {result.matches}/{result.items.length} matches
+                        </span>
+                      </div>
+
+                      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        {(() => {
+                          const bestMatch = Math.max(
+                            ...experimentResults.map((r: any) => r.match_rate)
+                          );
+                          const bestConfidence = Math.max(
+                            ...experimentResults.map((r: any) => r.avg_confidence)
+                          );
+                          const fastestTime = Math.min(
+                            ...experimentResults.map((r: any) => r.seconds)
+                          );
+
+                          const metrics = [
+                            {
+                              label: "MATCH RATE",
+                              value: `${result.match_rate}%`,
+                              description: result.match_rate === bestMatch
+                                ? "★ Best match rate"
+                                : "Requested digit",
+                              isBest: result.match_rate === bestMatch,
+                            },
+                            {
+                              label: "AVG CONFIDENCE",
+                              value: result.avg_confidence.toFixed(3),
+                              description: result.avg_confidence === bestConfidence
+                                ? "★ Highest confidence"
+                                : "Classifier confidence",
+                              isBest: result.avg_confidence === bestConfidence,
+                            },
+                            {
+                              label: "INFERENCE TIME",
+                              value: `${result.seconds} s`,
+                              description: result.seconds === fastestTime
+                                ? "★ Fastest configuration"
+                                : "Generation time",
+                              isBest: result.seconds === fastestTime,
+                            },
+                          ];
+
+                          return metrics.map((metric) => (
+                            <div
+                              key={metric.label}
+                              className={`rounded-2xl border p-4 transition-all ${metric.isBest
+                                ? "border-emerald-400/50 bg-emerald-500/10 shadow-[0_0_15px_rgba(52,211,153,0.08)]"
+                                : "border-white/10 bg-white/[0.03]"
+                                }`}
+                            >
+                              <p className="text-[10px] font-semibold tracking-[0.18em] text-slate-500">
+                                {metric.label}
+                              </p>
+                              <p className="mt-3 text-2xl font-bold text-white">
+                                {metric.value}
+                              </p>
+                              <p className={`mt-1 text-xs ${metric.isBest ? "font-semibold text-emerald-400" : "text-slate-500"
+                                }`}>
+                                {metric.description}
+                              </p>
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        {result.items.map((item: GeneratedItem, imageIndex: number) => (
+                          <ImageCard
+                            key={imageIndex}
+                            item={item}
+                            index={imageIndex}
+                            selectedDigit={digit}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="mt-10 border-t border-slate-700/60 pt-8">
+                <div className="mb-5 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xl font-semibold">Experiment History</h3>
+                    <p className="mt-1 text-sm text-slate-400">
+                      {savedExperiments.length} saved experiments
+                    </p>
+                  </div>
+                </div>
+
+                {historyLoading ? (
+                  <p className="text-sm text-slate-400">Loading experiment history...</p>
+                ) : historyError ? (
+                  <p className="text-sm text-red-400">{historyError}</p>
+                ) : savedExperiments.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-700 p-8 text-center">
+                    <p className="font-medium">No saved experiments yet</p>
+                    <p className="mt-2 text-sm text-slate-400">
+                      Run an experiment and click Save Experiment to see it here.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {savedExperiments.map((experiment) => (
+                      <div
+                        key={experiment.id}
+                        className="rounded-2xl border border-slate-700 bg-slate-900/50 p-5"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <h4 className="font-semibold capitalize">
+                              {experiment.experimentType} Experiment
+                            </h4>
+                            <p className="mt-1 text-xs text-slate-400">
+                              {new Date(experiment.createdAt).toLocaleString()}
+                            </p>
+                          </div>
+
+                          <button
+                            onClick={async () => {
+                              const db = await openDatabase();
+                              const transaction = db.transaction("experiments", "readwrite");
+                              transaction.objectStore("experiments").delete(experiment.id);
+
+                              transaction.oncomplete = () => {
+                                db.close();
+                                setSavedExperiments((current) =>
+                                  current.filter((item) => item.id !== experiment.id)
+                                );
+                              };
+
+                              transaction.onerror = () => db.close();
+                            }}
+                            className="rounded-lg border border-red-500/30 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10"
+                          >
+                            Delete
+                          </button>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                          <StatCard
+                            label="TARGET DIGIT"
+                            value={String(experiment.digit)}
+                            description="Generated class"
+                          />
+                          <StatCard
+                            label="CONFIGURATIONS"
+                            value={String(experiment.results.length)}
+                            description="Compared settings"
+                          />
+                          <StatCard
+                            label="TOTAL TIME"
+                            value={`${experiment.totalSeconds.toFixed(2)}s`}
+                            description="Experiment duration"
+                          />
+                          <StatCard
+                            label="SAMPLES"
+                            value={String(experiment.count)}
+                            description="Per configuration"
+                          />
+                        </div>
+
+                        <div className="mt-4 space-y-3">
+                          {experiment.results.map((result: any, index: number) => (
+                            <div
+                              key={index}
+                              className="rounded-xl border border-slate-700/70 p-4"
+                            >
+                              <p className="font-medium">
+                                {result.parameter} = {result.value}
+                              </p>
+                              <p className="mt-1 text-sm text-slate-400">
+                                Match rate: {result.match_rate.toFixed(1)}% ·
+                                Confidence: {result.avg_confidence.toFixed(3)} ·
+                                Time: {result.seconds.toFixed(2)}s
+                              </p>
+
+                              <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-8">
+                                {result.items.map((item: GeneratedItem, imageIndex: number) => (
+                                  <img
+                                    key={imageIndex}
+                                    src={`data:image/png;base64,${item.image}`}
+                                    alt={`Generated digit ${experiment.digit}`}
+                                    className="w-full rounded-lg border border-slate-700"
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
           )}
 
           {activeTab === "My Generations" && (

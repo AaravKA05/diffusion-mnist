@@ -128,6 +128,16 @@ class InterpolateRequest(BaseModel):
     frames: int = Field(9, ge=3, le=15)
 
 
+class ExperimentRequest(BaseModel):
+    experiment_type: str = Field("guidance", pattern="^(guidance|steps|seeds)$")
+    digit: int = Field(7, ge=0, le=9)
+    count: int = Field(4, ge=1, le=8)
+    values: list[float] = Field(min_length=2, max_length=4)
+    w: float = Field(1.2, ge=0.0, le=3.0)
+    steps: int = Field(30, ge=5, le=100)
+    seed: int = Field(42, ge=0, le=2**31 - 1)
+
+
 # --------------------------------------------------
 # Image utilities
 # --------------------------------------------------
@@ -262,6 +272,81 @@ def compare(req: CompareRequest):
         "digit": req.digit,
         "count": req.count,
         "seconds": round(elapsed, 2),
+        "results": results,
+    }
+
+
+# --------------------------------------------------
+# Experiment Lab
+# --------------------------------------------------
+
+
+@app.post("/api/experiment")
+def run_experiment(req: ExperimentRequest):
+
+    if req.experiment_type == "guidance":
+        values = [min(max(float(v), 0.0), 3.0) for v in req.values]
+
+    elif req.experiment_type == "steps":
+        values = [min(max(int(v), 5), 100) for v in req.values]
+
+    else:
+        values = [min(max(int(v), 0), 2**31 - 1) for v in req.values]
+
+    with lock:
+
+        total_start = time.perf_counter()
+        results = []
+
+        for value in values:
+
+            if req.experiment_type == "guidance":
+                w = value
+                steps = req.steps
+                seed = req.seed
+                parameter = "guidance"
+
+            elif req.experiment_type == "steps":
+                w = req.w
+                steps = int(value)
+                seed = req.seed
+                parameter = "steps"
+
+            else:
+                w = req.w
+                steps = req.steps
+                seed = int(value)
+                parameter = "seed"
+
+            start = time.perf_counter()
+
+            items, matches = run(req.digit, req.count, w, steps, seed, 128)
+
+            elapsed = time.perf_counter() - start
+
+            avg_confidence = (
+                sum(item["conf"] for item in items) / len(items) if items else 0
+            )
+
+            results.append(
+                {
+                    "parameter": parameter,
+                    "value": value,
+                    "matches": matches,
+                    "match_rate": round(matches / len(items) * 100, 2) if items else 0,
+                    "avg_confidence": round(avg_confidence, 3),
+                    "seconds": round(elapsed, 2),
+                    "items": items,
+                }
+            )
+
+        total_elapsed = time.perf_counter() - total_start
+
+    return {
+        "experiment_type": req.experiment_type,
+        "digit": req.digit,
+        "count": req.count,
+        "total_seconds": round(total_elapsed, 2),
         "results": results,
     }
 
