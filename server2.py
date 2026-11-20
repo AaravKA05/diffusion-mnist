@@ -119,6 +119,15 @@ class VisualizeRequest(BaseModel):
     snapshot_count: int = Field(8, ge=4, le=12)
 
 
+class InterpolateRequest(BaseModel):
+    digit: int = Field(7, ge=0, le=9)
+    w: float = Field(1.2, ge=0.0, le=3.0)
+    steps: int = Field(30, ge=5, le=100)
+    seed_a: int = Field(42, ge=0, le=2**31 - 1)
+    seed_b: int = Field(123, ge=0, le=2**31 - 1)
+    frames: int = Field(9, ge=3, le=15)
+
+
 # --------------------------------------------------
 # Image utilities
 # --------------------------------------------------
@@ -260,6 +269,57 @@ def compare(req: CompareRequest):
 # --------------------------------------------------
 # Diffusion visualization
 # --------------------------------------------------
+
+
+@app.post("/api/interpolate")
+def interpolate(req: InterpolateRequest):
+    with lock:
+        start = time.perf_counter()
+
+        labels = torch.full((1,), req.digit, device=device, dtype=torch.long)
+
+        generator_a = torch.Generator(device=device).manual_seed(req.seed_a)
+        generator_b = torch.Generator(device=device).manual_seed(req.seed_b)
+
+        shape = (1, 1, config.IMG_SIZE, config.IMG_SIZE)
+
+        noise_a = torch.randn(shape, generator=generator_a, device=device)
+        noise_b = torch.randn(shape, generator=generator_b, device=device)
+
+        alphas = torch.linspace(0, 1, req.frames).tolist()
+        results = []
+
+        for alpha in alphas:
+            noise = (1 - alpha) * noise_a + alpha * noise_b
+
+            images = cond_ddim_sample(
+                model,
+                labels,
+                steps=req.steps,
+                w=req.w,
+                initial_noise=noise,
+            )
+
+            image = images[0].detach().cpu()
+            image = ((image + 1) / 2).clamp(0, 1)
+            image = (image.squeeze().numpy() * 255).astype("uint8")
+
+            buffer = io.BytesIO()
+            Image.fromarray(image).save(buffer, format="PNG")
+
+            results.append(
+                {
+                    "alpha": round(alpha, 3),
+                    "image": base64.b64encode(buffer.getvalue()).decode("utf-8"),
+                }
+            )
+
+        return {
+            "digit": req.digit,
+            "frames": results,
+            "count": len(results),
+            "inference_time": round(time.perf_counter() - start, 3),
+        }
 
 
 @app.post("/api/visualize")
