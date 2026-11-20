@@ -1,10 +1,8 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
 
-const API =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+const API = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 const DB_NAME = "DiffusionLabDB";
 const STORE_NAME = "generations";
 
@@ -31,6 +29,20 @@ type GenerationRecord = {
   elapsed: number;
   matches: number;
   items: GeneratedItem[];
+};
+
+type VisualizationFrame = {
+  timestep: number;
+  image: string;
+};
+
+type VisualizationResult = {
+  digit: number;
+  steps: number;
+  guidance: number;
+  seed: number;
+  seconds: number;
+  snapshots: VisualizationFrame[];
 };
 
 type EvaluationResult = {
@@ -259,7 +271,6 @@ export default function Home() {
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
 
-  // EVALUATION STATES
   const [evalDigit, setEvalDigit] = useState(7);
   const [evalCount, setEvalCount] = useState(8);
   const [evalGuidance, setEvalGuidance] = useState(1.2);
@@ -269,7 +280,17 @@ export default function Home() {
   const [evaluationLoading, setEvaluationLoading] = useState(false);
   const [evaluationError, setEvaluationError] = useState("");
 
-  // LOAD HISTORY
+  const [visualDigit, setVisualDigit] = useState(7);
+  const [visualGuidance, setVisualGuidance] = useState(1.2);
+  const [visualSteps, setVisualSteps] = useState(20);
+  const [visualSeed, setVisualSeed] = useState(42);
+  const [snapshotCount, setSnapshotCount] = useState(8);
+  const [visualization, setVisualization] =
+    useState<VisualizationResult | null>(null);
+  const [visualizationLoading, setVisualizationLoading] = useState(false);
+  const [visualizationError, setVisualizationError] = useState("");
+  const [activeFrame, setActiveFrame] = useState(0);
+
   useEffect(() => {
     let mounted = true;
 
@@ -293,7 +314,6 @@ export default function Home() {
     };
   }, []);
 
-  // BACKEND HEALTH MONITOR
   useEffect(() => {
     let mounted = true;
 
@@ -330,7 +350,6 @@ export default function Home() {
     };
   }, []);
 
-  // GENERATE IMAGES
   async function generateImages() {
     setLoading(true);
     setError("");
@@ -393,7 +412,6 @@ export default function Home() {
     }
   }
 
-  // GUIDANCE COMPARISON
   async function compareGuidance() {
     setCompareLoading(true);
     setError("");
@@ -433,7 +451,49 @@ export default function Home() {
     }
   }
 
-  // RUN EVALUATION
+  async function runVisualization() {
+    setVisualizationLoading(true);
+    setVisualizationError("");
+    setVisualization(null);
+    setActiveFrame(0);
+
+    try {
+      const response = await fetch(`${API}/api/visualize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          digit: visualDigit,
+          w: visualGuidance,
+          steps: visualSteps,
+          seed: visualSeed,
+          snapshot_count: snapshotCount,
+        }),
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(
+          `Visualization failed (${response.status}): ${message}`
+        );
+      }
+
+      const data: VisualizationResult = await response.json();
+
+      if (!data.snapshots || data.snapshots.length === 0) {
+        throw new Error("The backend returned no visualization frames.");
+      }
+
+      setVisualization(data);
+      setActiveFrame(0);
+    } catch (err) {
+      setVisualizationError(
+        err instanceof Error ? err.message : "Unable to run visualization."
+      );
+    } finally {
+      setVisualizationLoading(false);
+    }
+  }
+
   async function runEvaluation() {
     setEvaluationLoading(true);
     setEvaluationError("");
@@ -468,7 +528,6 @@ export default function Home() {
     }
   }
 
-  // RESTORE SETTINGS
   function reuseSettings(record: GenerationRecord) {
     setDigit(record.digit);
     setCount(record.count);
@@ -479,7 +538,6 @@ export default function Home() {
     setStatus("Previous generation settings restored.");
   }
 
-  // DELETE ONE RECORD
   async function removeRecord(id: string) {
     try {
       await deleteGeneration(id);
@@ -490,7 +548,6 @@ export default function Home() {
     }
   }
 
-  // DELETE ALL RECORDS
   async function removeAllRecords() {
     if (!window.confirm("Delete all saved generations from this browser?")) {
       return;
@@ -505,7 +562,6 @@ export default function Home() {
     }
   }
 
-  // ACTIVITY STATISTICS
   const totalImages = history.reduce(
     (total, record) => total + record.items.length,
     0
@@ -530,11 +586,11 @@ export default function Home() {
     ["▦", "My Generations"],
     ["◉", "Model Insights"],
     ["◎", "Evaluation"],
+    ["◌", "Denoising Visualizer"],
   ];
 
   return (
     <main className="min-h-screen bg-[#080b14] text-white selection:bg-violet-500/30">
-      {/* BACKGROUND */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -left-40 top-20 h-96 w-96 rounded-full bg-blue-600/10 blur-[130px]" />
         <div className="absolute right-0 top-40 h-96 w-96 rounded-full bg-violet-600/10 blur-[130px]" />
@@ -542,7 +598,6 @@ export default function Home() {
       </div>
 
       <div className="relative mx-auto flex min-h-screen max-w-[1600px]">
-        {/* SIDEBAR */}
         <aside className="hidden w-64 shrink-0 border-r border-white/[0.07] bg-white/[0.015] p-6 lg:flex lg:flex-col">
           <div className="mb-12 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 text-xl font-bold">
@@ -604,9 +659,7 @@ export default function Home() {
           </div>
         </aside>
 
-        {/* MAIN CONTENT */}
         <section className="min-w-0 flex-1 px-5 py-7 sm:px-8 lg:px-10">
-          {/* MOBILE NAVIGATION */}
           <div className="mb-6 flex gap-2 overflow-x-auto lg:hidden">
             {tabs.map(([icon, name]) => (
               <button
@@ -622,7 +675,6 @@ export default function Home() {
             ))}
           </div>
 
-          {/* HEADER */}
           <header className="mb-10 flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="mb-2 text-xs tracking-widest text-violet-300">
@@ -635,7 +687,9 @@ export default function Home() {
                     ? "My Generations"
                     : activeTab === "Evaluation"
                       ? "Model Evaluation"
-                      : "Model Insights"}
+                      : activeTab === "Denoising Visualizer"
+                        ? "Denoising Visualizer"
+                        : "Model Insights"}
                 <span className="text-violet-400">.</span>
               </h2>
               <p className="mt-2 text-sm text-slate-500">
@@ -645,7 +699,9 @@ export default function Home() {
                     ? "Your previously generated samples, saved in this browser."
                     : activeTab === "Evaluation"
                       ? "Evaluate class consistency, confidence, diversity and inference speed."
-                      : "A summary of your generation activity and model configuration."}
+                      : activeTab === "Denoising Visualizer"
+                        ? "Watch a noisy image progressively become a generated digit."
+                        : "A summary of your generation activity and model configuration."}
               </p>
             </div>
 
@@ -668,7 +724,347 @@ export default function Home() {
             </div>
           </header>
 
-          {/* STUDIO */}
+          {activeTab === "Denoising Visualizer" && (
+            <section className="space-y-6">
+              <div className="rounded-3xl border border-violet-400/20 bg-violet-500/[0.06] p-6 sm:p-8">
+                <p className="text-xs tracking-widest text-violet-300">
+                  DIFFUSION PROCESS / STEP BY STEP
+                </p>
+                <h3 className="mt-2 text-2xl font-semibold">
+                  From Noise to a Handwritten Digit
+                </h3>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
+                  This visualizer captures intermediate states from the actual
+                  DDIM sampling process. Move through the frames to see how the
+                  model gradually transforms random noise into the selected
+                  digit.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-[0.8fr_1.2fr]">
+                <div className="rounded-3xl border border-white/10 bg-[#111522]/80 p-6 sm:p-8">
+                  <p className="text-xs tracking-widest text-violet-300">
+                    01 / CONFIGURATION
+                  </p>
+                  <h3 className="mt-2 text-xl font-semibold">
+                    Visualizer Settings
+                  </h3>
+
+                  <div className="mt-7">
+                    <div className="mb-3 flex justify-between text-sm">
+                      <label>Target digit</label>
+                      <span className="text-violet-300">{visualDigit}</span>
+                    </div>
+                    <div className="grid grid-cols-5 gap-2">
+                      {Array.from({ length: 10 }, (_, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setVisualDigit(i)}
+                          className={`aspect-square rounded-xl border text-lg font-semibold ${visualDigit === i
+                            ? "border-violet-400 bg-violet-500/30 text-white"
+                            : "border-white/10 bg-white/[0.035] text-slate-400 hover:bg-white/10"
+                            }`}
+                        >
+                          {i}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-7 space-y-6">
+                    <div>
+                      <div className="mb-2 flex justify-between text-sm">
+                        <label>Guidance scale</label>
+                        <span className="text-violet-300">
+                          {visualGuidance.toFixed(1)}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="3"
+                        step="0.1"
+                        value={visualGuidance}
+                        onChange={(e) =>
+                          setVisualGuidance(Number(e.target.value))
+                        }
+                        className="w-full accent-violet-500"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="mb-2 flex justify-between text-sm">
+                        <label>DDIM sampling steps</label>
+                        <span className="text-violet-300">{visualSteps}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="5"
+                        max="100"
+                        step="5"
+                        value={visualSteps}
+                        onChange={(e) =>
+                          setVisualSteps(Number(e.target.value))
+                        }
+                        className="w-full accent-violet-500"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="mb-2 flex justify-between text-sm">
+                        <label>Snapshot count</label>
+                        <span className="text-violet-300">{snapshotCount}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="4"
+                        max="12"
+                        step="1"
+                        value={snapshotCount}
+                        onChange={(e) =>
+                          setSnapshotCount(Number(e.target.value))
+                        }
+                        className="w-full accent-violet-500"
+                      />
+                      <p className="mt-1 text-xs text-slate-500">
+                        Number of intermediate sampling states to capture.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm">Random seed</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          min="0"
+                          max="2147483647"
+                          value={visualSeed}
+                          onChange={(e) =>
+                            setVisualSeed(
+                              Math.max(
+                                0,
+                                Math.min(
+                                  2147483647,
+                                  Number(e.target.value) || 0
+                                )
+                              )
+                            )
+                          }
+                          className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none"
+                        />
+                        <button
+                          onClick={() =>
+                            setVisualSeed(Math.floor(Math.random() * 100000))
+                          }
+                          className="rounded-xl border border-white/10 bg-white/5 px-3 text-xs hover:bg-white/10"
+                        >
+                          Random
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={runVisualization}
+                    disabled={visualizationLoading || backendOnline !== true}
+                    className="mt-8 w-full rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 py-4 font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {visualizationLoading
+                      ? "Generating sampling frames..."
+                      : backendOnline === true
+                        ? "Run Denoising Visualization"
+                        : "Backend Unavailable"}
+                  </button>
+
+                  {visualizationError && (
+                    <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">
+                      {visualizationError}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-3xl border border-white/10 bg-[#111522]/80 p-6 sm:p-8">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs tracking-widest text-cyan-300">
+                        02 / SAMPLING TIMELINE
+                      </p>
+                      <h3 className="mt-2 text-xl font-semibold">
+                        Denoising Frames
+                      </h3>
+                    </div>
+                    {visualization && (
+                      <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-300">
+                        {visualization.snapshots.length} frames captured
+                      </span>
+                    )}
+                  </div>
+
+                  {!visualization && !visualizationLoading && (
+                    <div className="mt-6 flex min-h-[380px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-black/20 p-8 text-center">
+                      <div className="flex h-28 w-28 items-center justify-center rounded-3xl border border-violet-400/20 bg-violet-500/10 text-6xl text-violet-300">
+                        {visualDigit}
+                      </div>
+                      <h4 className="mt-6 text-lg font-medium">
+                        Ready to visualize
+                      </h4>
+                      <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">
+                        Configure the sampling parameters and run the
+                        visualizer. The first frame represents noise and the
+                        final frame is the generated sample.
+                      </p>
+                    </div>
+                  )}
+
+                  {visualizationLoading && (
+                    <div className="mt-6 flex min-h-[380px] items-center justify-center rounded-2xl border border-white/10 bg-black/20 text-sm text-violet-300">
+                      Running the DDIM sampler and capturing intermediate
+                      states...
+                    </div>
+                  )}
+
+                  {visualization && visualization.snapshots.length > 0 && (
+                    <div className="mt-6">
+                      <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
+                        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="text-xs text-slate-500">
+                              CURRENT FRAME
+                            </p>
+                            <h4 className="mt-1 text-lg font-semibold">
+                              {activeFrame === 0
+                                ? "Initial Noise"
+                                : activeFrame ===
+                                  visualization.snapshots.length - 1
+                                  ? "Final Generated Digit"
+                                  : `Denoising Stage ${activeFrame}`}
+                            </h4>
+                          </div>
+                          <span className="rounded-lg bg-white/5 px-3 py-2 text-xs text-slate-300">
+                            Timestep:{" "}
+                            {visualization.snapshots[activeFrame]?.timestep ??
+                              "—"}
+                          </span>
+                        </div>
+
+                        <div className="mx-auto max-w-[420px] rounded-2xl border border-white/10 bg-[#080b14] p-4">
+                          <img
+                            src={`data:image/png;base64,${visualization.snapshots[activeFrame]?.image ?? ""
+                              }`}
+                            alt={`Denoising frame ${activeFrame + 1}`}
+                            className="aspect-square w-full object-contain"
+                          />
+                        </div>
+
+                        <div className="mt-5 flex items-center justify-between gap-3">
+                          <button
+                            onClick={() =>
+                              setActiveFrame((current) =>
+                                Math.max(0, current - 1)
+                              )
+                            }
+                            disabled={activeFrame === 0}
+                            className="rounded-xl border border-white/10 px-4 py-2 text-sm disabled:opacity-30"
+                          >
+                            Previous
+                          </button>
+
+                          <span className="text-xs tabular-nums text-slate-400">
+                            {activeFrame + 1} /{" "}
+                            {visualization.snapshots.length}
+                          </span>
+
+                          <button
+                            onClick={() =>
+                              setActiveFrame((current) =>
+                                Math.min(
+                                  visualization.snapshots.length - 1,
+                                  current + 1
+                                )
+                              )
+                            }
+                            disabled={
+                              activeFrame ===
+                              visualization.snapshots.length - 1
+                            }
+                            className="rounded-xl border border-white/10 px-4 py-2 text-sm disabled:opacity-30"
+                          >
+                            Next
+                          </button>
+                        </div>
+
+                        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-blue-500 to-violet-500"
+                            style={{
+                              width: `${((activeFrame + 1) /
+                                visualization.snapshots.length) *
+                                100
+                                }%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mt-5 grid grid-cols-3 gap-3">
+                        <StatCard
+                          label="DIGIT"
+                          value={String(visualization.digit)}
+                          description="Condition label"
+                        />
+                        <StatCard
+                          label="DDIM STEPS"
+                          value={String(visualization.steps)}
+                          description="Sampling steps"
+                        />
+                        <StatCard
+                          label="TIME"
+                          value={`${visualization.seconds.toFixed(2)} s`}
+                          description="Backend runtime"
+                        />
+                      </div>
+
+                      <div className="mt-5">
+                        <p className="mb-3 text-xs font-semibold tracking-widest text-slate-500">
+                          ALL CAPTURED FRAMES · SELECT TO INSPECT
+                        </p>
+                        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+                          {visualization.snapshots.map((frame, index) => (
+                            <button
+                              key={`${frame.timestep}-${index}`}
+                              onClick={() => setActiveFrame(index)}
+                              className={`rounded-xl border p-2 text-left transition ${activeFrame === index
+                                ? "border-violet-400 bg-violet-500/10"
+                                : "border-white/10 bg-black/20 hover:border-white/30"
+                                }`}
+                            >
+                              <img
+                                src={`data:image/png;base64,${frame.image}`}
+                                alt={`Snapshot ${index + 1}`}
+                                className="aspect-square w-full rounded-lg bg-[#080b14] object-contain"
+                              />
+                              <p className="mt-2 text-[10px] text-slate-400">
+                                {index === 0
+                                  ? "Initial noise"
+                                  : index ===
+                                    visualization.snapshots.length - 1
+                                    ? "Final image"
+                                    : `Frame ${index + 1}`}
+                              </p>
+                              <p className="text-[10px] text-slate-600">
+                                t = {frame.timestep}
+                              </p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
+
           {activeTab === "Studio" && (
             <>
               <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -690,7 +1086,6 @@ export default function Home() {
               </div>
 
               <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_0.85fr]">
-                {/* CONTROLS */}
                 <div className="rounded-3xl border border-white/10 bg-[#111522]/80 p-6 sm:p-8">
                   <p className="text-xs tracking-widest text-violet-300">
                     01 / CONFIGURATION
@@ -702,7 +1097,9 @@ export default function Home() {
                   <div className="mb-8 mt-7">
                     <div className="mb-4 flex justify-between text-sm">
                       <label className="text-slate-300">Select a digit</label>
-                      <span className="text-violet-300">Selected: {digit}</span>
+                      <span className="text-violet-300">
+                        Selected: {digit}
+                      </span>
                     </div>
 
                     <div className="grid grid-cols-5 gap-3 sm:grid-cols-10">
@@ -803,7 +1200,9 @@ export default function Home() {
 
                   <button
                     onClick={generateImages}
-                    disabled={loading || compareLoading || backendOnline !== true}
+                    disabled={
+                      loading || compareLoading || backendOnline !== true
+                    }
                     className="mt-9 w-full rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 py-4 font-semibold disabled:opacity-50"
                   >
                     {loading
@@ -824,7 +1223,6 @@ export default function Home() {
                   )}
                 </div>
 
-                {/* OUTPUT */}
                 <div className="flex min-h-[480px] flex-col rounded-3xl border border-white/10 bg-[#111522]/70 p-6 sm:p-8">
                   <p className="text-xs tracking-widest text-cyan-300">
                     02 / OUTPUT
@@ -900,7 +1298,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* GUIDANCE COMPARISON */}
               <section className="mt-8 rounded-3xl border border-white/10 bg-[#111522]/80 p-6 sm:p-8">
                 <p className="text-xs tracking-widest text-cyan-300">
                   03 / MODEL EXPERIMENTATION
@@ -938,7 +1335,9 @@ export default function Home() {
 
                 <button
                   onClick={compareGuidance}
-                  disabled={compareLoading || loading || backendOnline !== true}
+                  disabled={
+                    compareLoading || loading || backendOnline !== true
+                  }
                   className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 py-4 font-semibold disabled:opacity-50"
                 >
                   {compareLoading
@@ -1011,7 +1410,6 @@ export default function Home() {
             </>
           )}
 
-          {/* MY GENERATIONS */}
           {activeTab === "My Generations" && (
             <section>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -1052,22 +1450,22 @@ export default function Home() {
                   </p>
                   <button
                     onClick={() => setActiveTab("Studio")}
-                    className="mt-6 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 px-6 py-3 text-sm font-semibold"
+                    className="mt-5 rounded-xl bg-violet-600 px-5 py-3 text-sm font-medium"
                   >
                     Open Studio
                   </button>
                 </div>
               ) : (
-                <div className="space-y-5">
+                <div className="space-y-6">
                   {history.map((record) => (
                     <div
                       key={record.id}
-                      className="rounded-3xl border border-white/10 bg-[#111522]/80 p-5 sm:p-6"
+                      className="rounded-3xl border border-white/10 bg-[#111522]/70 p-5 sm:p-7"
                     >
-                      <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
-                          <h4 className="font-semibold">
-                            Digit {record.digit} · {record.items.length} samples
+                          <h4 className="text-lg font-semibold">
+                            Digit {record.digit}
                           </h4>
                           <p className="mt-1 text-xs text-slate-500">
                             {new Date(record.createdAt).toLocaleString()}
@@ -1079,9 +1477,8 @@ export default function Home() {
                             onClick={() => reuseSettings(record)}
                             className="rounded-lg border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-xs text-violet-200"
                           >
-                            ↻ Reuse Settings
+                            Reuse Settings
                           </button>
-
                           <button
                             onClick={() =>
                               record.items.forEach((item, index) =>
@@ -1097,9 +1494,8 @@ export default function Home() {
                             }
                             className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs"
                           >
-                            ↓ Download All
+                            Download All
                           </button>
-
                           <button
                             onClick={() => removeRecord(record.id)}
                             className="rounded-lg border border-red-400/20 bg-red-500/10 px-3 py-2 text-xs text-red-300"
@@ -1109,7 +1505,7 @@ export default function Home() {
                         </div>
                       </div>
 
-                      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <div className="my-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
                         <StatCard
                           label="GUIDANCE"
                           value={record.guidance.toFixed(1)}
@@ -1160,7 +1556,6 @@ export default function Home() {
             </section>
           )}
 
-          {/* MODEL INSIGHTS */}
           {activeTab === "Model Insights" && (
             <section>
               <div className="mb-6">
@@ -1287,7 +1682,6 @@ export default function Home() {
             </section>
           )}
 
-          {/* EVALUATION */}
           {activeTab === "Evaluation" && (
             <section>
               <div className="mb-6">
@@ -1300,7 +1694,6 @@ export default function Home() {
                 </p>
               </div>
 
-              {/* EVALUATION CONTROLS */}
               <div className="rounded-3xl border border-white/10 bg-[#111522]/80 p-6 sm:p-8">
                 <p className="text-xs tracking-widest text-violet-300">
                   01 / EXPERIMENT CONFIGURATION
@@ -1415,7 +1808,6 @@ export default function Home() {
                 )}
               </div>
 
-              {/* EVALUATION RESULTS */}
               {evaluation && (
                 <div className="mt-8 space-y-6">
                   <div>
@@ -1530,9 +1922,7 @@ export default function Home() {
                         does not directly measure generator accuracy.
                       </p>
                       <p>
-                        <strong className="text-cyan-300">
-                          Diversity:
-                        </strong>{" "}
+                        <strong className="text-cyan-300">Diversity:</strong>{" "}
                         Mean pairwise pixel-space L1 distance. It is a simple
                         diversity indicator, not a perceptual metric or FID.
                       </p>
@@ -1550,7 +1940,6 @@ export default function Home() {
             </section>
           )}
 
-          {/* FOOTER */}
           <footer className="mt-10 border-t border-white/[0.07] py-6 text-xs text-slate-600">
             DiffusionLab · PyTorch + FastAPI + Next.js
           </footer>
