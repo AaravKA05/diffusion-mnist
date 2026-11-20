@@ -291,6 +291,35 @@ export default function Home() {
   const [visualizationError, setVisualizationError] = useState("");
   const [activeFrame, setActiveFrame] = useState(0);
 
+  const [interpDigit, setInterpDigit] = useState(7);
+  const [interpGuidance, setInterpGuidance] = useState(1.2);
+  const [interpSteps, setInterpSteps] = useState(30);
+  const [seedA, setSeedA] = useState(42);
+  const [seedB, setSeedB] = useState(123);
+  const [interpFrameCount, setInterpFrameCount] = useState(9);
+  const [interpolation, setInterpolation] = useState<any>(null);
+  const [interpolationLoading, setInterpolationLoading] = useState(false);
+  const [interpolationError, setInterpolationError] = useState("");
+  const [selectedInterpFrame, setSelectedInterpFrame] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  useEffect(() => {
+    if (!isPlaying || !interpolation?.frames?.length) return;
+
+    const timer = setInterval(() => {
+      setSelectedInterpFrame((current) => {
+        if (current >= interpolation.frames.length - 1) {
+          setIsPlaying(false);
+          return 0;
+        }
+
+        return current + 1;
+      });
+    }, 700);
+
+    return () => clearInterval(timer);
+  }, [isPlaying, interpolation]);
+
   useEffect(() => {
     let mounted = true;
 
@@ -494,6 +523,53 @@ export default function Home() {
     }
   }
 
+  async function runInterpolation() {
+    setInterpolationLoading(true);
+    setInterpolationError("");
+    setInterpolation(null);
+    setSelectedInterpFrame(0);
+    setIsPlaying(false);
+
+    try {
+      const response = await fetch(`${API}/api/interpolate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          digit: interpDigit,
+          w: interpGuidance,
+          steps: interpSteps,
+          seed_a: seedA,
+          seed_b: seedB,
+          frames: interpFrameCount,
+        }),
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(
+          `Interpolation failed (${response.status}): ${message}`
+        );
+      }
+
+      const data = await response.json();
+
+      if (!data.frames || data.frames.length === 0) {
+        throw new Error("The backend returned no interpolation frames.");
+      }
+
+      setInterpolation(data);
+      setSelectedInterpFrame(0);
+    } catch (err) {
+      setInterpolationError(
+        err instanceof Error
+          ? err.message
+          : "Unable to run noise interpolation."
+      );
+    } finally {
+      setInterpolationLoading(false);
+    }
+  }
+
   async function runEvaluation() {
     setEvaluationLoading(true);
     setEvaluationError("");
@@ -587,6 +663,7 @@ export default function Home() {
     ["◉", "Model Insights"],
     ["◎", "Evaluation"],
     ["◌", "Denoising Visualizer"],
+    ["◈", "Noise Interpolation"],
   ];
 
   return (
@@ -689,7 +766,9 @@ export default function Home() {
                       ? "Model Evaluation"
                       : activeTab === "Denoising Visualizer"
                         ? "Denoising Visualizer"
-                        : "Model Insights"}
+                        : activeTab === "Noise Interpolation"
+                          ? "Noise Interpolation"
+                          : "Model Insights"}
                 <span className="text-violet-400">.</span>
               </h2>
               <p className="mt-2 text-sm text-slate-500">
@@ -701,7 +780,9 @@ export default function Home() {
                       ? "Evaluate class consistency, confidence, diversity and inference speed."
                       : activeTab === "Denoising Visualizer"
                         ? "Watch a noisy image progressively become a generated digit."
-                        : "A summary of your generation activity and model configuration."}
+                        : activeTab === "Noise Interpolation"
+                          ? "Explore smooth transitions between two random noise inputs."
+                          : "A summary of your generation activity and model configuration."}
               </p>
             </div>
 
@@ -1064,6 +1145,296 @@ export default function Home() {
               </div>
             </section>
           )}
+
+
+          {activeTab === "Noise Interpolation" && (
+            <section className="space-y-6">
+              <div className="rounded-3xl border border-violet-400/20 bg-violet-500/[0.06] p-6 sm:p-8">
+                <p className="text-xs font-semibold tracking-[0.2em] text-violet-300">
+                  LATENT SPACE EXPLORATION
+                </p>
+                <h3 className="mt-3 text-2xl font-semibold">
+                  Noise Interpolation
+                </h3>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
+                  Explore how the diffusion model transforms different
+                  random noise inputs into the same conditioned digit.
+                  Move through intermediate frames to observe the transition.
+                </p>
+              </div>
+
+              <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
+                <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+                  <h3 className="text-lg font-semibold">Interpolation Settings</h3>
+
+                  <div className="mt-6 space-y-5">
+                    <div>
+                      <label className="text-sm text-slate-400">Target Digit</label>
+                      <select
+                        value={interpDigit}
+                        onChange={(e) => setInterpDigit(Number(e.target.value))}
+                        className="mt-2 w-full rounded-xl border border-white/10 bg-[#111827] p-3 text-white"
+                      >
+                        {Array.from({ length: 10 }, (_, i) => (
+                          <option key={i} value={i}>{i}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-sm text-slate-400">
+                        CFG Guidance: {interpGuidance.toFixed(1)}
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="3"
+                        step="0.1"
+                        value={interpGuidance}
+                        onChange={(e) => setInterpGuidance(Number(e.target.value))}
+                        className="mt-3 w-full accent-violet-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm text-slate-400">
+                        Sampling Steps: {interpSteps}
+                      </label>
+                      <input
+                        type="range"
+                        min="5"
+                        max="100"
+                        step="5"
+                        value={interpSteps}
+                        onChange={(e) => setInterpSteps(Number(e.target.value))}
+                        className="mt-3 w-full accent-violet-500"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-slate-400">Seed A</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="2147483647"
+                          value={seedA}
+                          onChange={(e) => setSeedA(Math.max(0, Math.min(2147483647, Number(e.target.value))))}
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-[#111827] p-3 text-sm text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-slate-400">Seed B</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="2147483647"
+                          value={seedB}
+                          onChange={(e) => setSeedB(Math.max(0, Math.min(2147483647, Number(e.target.value))))}
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-[#111827] p-3 text-sm text-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-sm text-slate-400">
+                        Number of Frames: {interpFrameCount}
+                      </label>
+                      <input
+                        type="range"
+                        min="3"
+                        max="15"
+                        step="1"
+                        value={interpFrameCount}
+                        onChange={(e) => setInterpFrameCount(Number(e.target.value))}
+                        className="mt-3 w-full accent-violet-500"
+                      />
+                    </div>
+
+                    <button
+                      onClick={runInterpolation}
+                      disabled={interpolationLoading}
+                      className="w-full rounded-xl bg-violet-600 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {interpolationLoading ? "Generating Frames..." : "Generate Interpolation"}
+                    </button>
+
+                    {interpolationError && (
+                      <p className="rounded-xl border border-red-400/20 bg-red-400/5 p-3 text-sm text-red-300">
+                        {interpolationError}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+                  {!interpolation ? (
+                    <div className="flex min-h-[400px] flex-col items-center justify-center text-center">
+                      <div className="text-5xl text-violet-400">◈</div>
+                      <h3 className="mt-5 text-xl font-semibold">
+                        Ready to interpolate
+                      </h3>
+                      <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">
+                        Generate frames to explore the transition between
+                        two random noise inputs.
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-xl font-semibold">
+                            Interpolation Results
+                          </h3>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Target digit: {interpolation.digit}
+                          </p>
+                        </div>
+                        <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5 text-xs text-emerald-300">
+                          {interpolation.count} frames generated
+                        </span>
+                      </div>
+
+                      <div className="mt-7 grid grid-cols-1 gap-5 sm:grid-cols-2">
+                        <div className="rounded-2xl border border-white/10 bg-[#080b14] p-4">
+                          <p className="mb-3 text-xs text-slate-400">Starting Noise · Seed {seedA}</p>
+                          <img
+                            src={`data:image/png;base64,${interpolation.frames[0].image}`}
+                            alt="Starting interpolation frame"
+                            className="aspect-square w-full rounded-xl object-contain"
+                          />
+                        </div>
+
+                        <div className="rounded-2xl border border-white/10 bg-[#080b14] p-4">
+                          <p className="mb-3 text-xs text-slate-400">Ending Noise · Seed {seedB}</p>
+                          <img
+                            src={`data:image/png;base64,${interpolation.frames[interpolation.frames.length - 1].image}`}
+                            alt="Ending interpolation frame"
+                            className="aspect-square w-full rounded-xl object-contain"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mt-8 rounded-2xl border border-violet-400/20 bg-violet-500/[0.05] p-5">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <h4 className="font-semibold">Explore Transition</h4>
+                          <span className="text-sm text-violet-300">
+                            α = {interpolation.frames[selectedInterpFrame]?.alpha.toFixed(3)}
+                          </span>
+                        </div>
+
+                        <div className="mx-auto mt-5 max-w-sm rounded-2xl border border-white/10 bg-[#080b14] p-4">
+                          <img
+                            src={`data:image/png;base64,${interpolation.frames[selectedInterpFrame]?.image}`}
+                            alt={`Interpolation frame ${selectedInterpFrame + 1}`}
+                            className="aspect-square w-full rounded-xl object-contain"
+                          />
+                        </div>
+
+                        <div className="mt-5 flex items-center justify-between text-xs text-slate-400">
+                          <span>Frame {selectedInterpFrame + 1}</span>
+                          <span>of {interpolation.frames.length}</span>
+                        </div>
+
+                        <input
+                          type="range"
+                          min="0"
+                          max={interpolation.frames.length - 1}
+                          step="1"
+                          value={selectedInterpFrame}
+                          onChange={(e) => setSelectedInterpFrame(Number(e.target.value))}
+                          className="mt-3 w-full accent-violet-500"
+                        />
+
+                        <div className="mt-5 flex justify-center gap-3">
+                          <button
+                            onClick={() => {
+                              if (selectedInterpFrame >= interpolation.frames.length - 1) {
+                                setSelectedInterpFrame(0);
+                              }
+                              setIsPlaying(!isPlaying);
+                            }}
+                            className="rounded-xl bg-violet-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-violet-500"
+                          >
+                            {isPlaying ? "Pause" : "Play"}
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setIsPlaying(false);
+                              setSelectedInterpFrame(0);
+                            }}
+                            className="rounded-xl border border-white/10 px-6 py-2.5 text-sm text-slate-300 hover:bg-white/5"
+                          >
+                            Reset
+                          </button>
+                        </div>
+
+                        <div className="mt-4 flex justify-between gap-3">
+                          <button
+                            onClick={() => setSelectedInterpFrame(0)}
+                            className="rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-300 hover:bg-white/5"
+                          >
+                            First
+                          </button>
+                          <button
+                            onClick={() => setSelectedInterpFrame(Math.max(0, selectedInterpFrame - 1))}
+                            disabled={selectedInterpFrame === 0}
+                            className="rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-300 disabled:opacity-30"
+                          >
+                            Previous
+                          </button>
+                          <button
+                            onClick={() => setSelectedInterpFrame(Math.min(interpolation.frames.length - 1, selectedInterpFrame + 1))}
+                            disabled={selectedInterpFrame === interpolation.frames.length - 1}
+                            className="rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-300 disabled:opacity-30"
+                          >
+                            Next
+                          </button>
+                          <button
+                            onClick={() => setSelectedInterpFrame(interpolation.frames.length - 1)}
+                            className="rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-300 hover:bg-white/5"
+                          >
+                            Last
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="mt-6">
+                        <h4 className="mb-4 font-semibold">All Interpolation Frames</h4>
+                        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
+                          {interpolation.frames.map((frame: any, index: number) => (
+                            <button
+                              key={index}
+                              onClick={() => setSelectedInterpFrame(index)}
+                              className={`rounded-xl border p-2 transition ${selectedInterpFrame === index
+                                ? "border-violet-400 bg-violet-500/10"
+                                : "border-white/10 bg-white/[0.02] hover:border-white/30"
+                                }`}
+                            >
+                              <img
+                                src={`data:image/png;base64,${frame.image}`}
+                                alt={`Interpolation frame ${index + 1}`}
+                                className="aspect-square w-full rounded-lg object-contain"
+                              />
+                              <p className="mt-2 text-xs text-slate-400">
+                                α = {frame.alpha.toFixed(2)}
+                              </p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <p className="mt-5 text-xs text-slate-500">
+                        Inference time: {interpolation.inference_time}s
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
+
 
           {activeTab === "Studio" && (
             <>
