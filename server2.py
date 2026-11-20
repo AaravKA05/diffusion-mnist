@@ -8,6 +8,7 @@ APIs:
     POST /api/generate
     POST /api/compare
     POST /api/evaluate
+    POST /api/visualize
 """
 
 import base64
@@ -33,6 +34,7 @@ from sample_cond import cond_ddim_sample
 
 BASE = Path(__file__).parent
 
+
 # --------------------------------------------------
 # Load models once at startup
 # --------------------------------------------------
@@ -55,6 +57,7 @@ clf.eval()
 
 lock = threading.Lock()
 
+
 # --------------------------------------------------
 # FastAPI application
 # --------------------------------------------------
@@ -73,6 +76,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # --------------------------------------------------
 # Request models
@@ -107,13 +111,21 @@ class EvalRequest(BaseModel):
     seed: int = Field(42, ge=0, le=2**31 - 1)
 
 
+class VisualizeRequest(BaseModel):
+    digit: int = Field(7, ge=0, le=9)
+    w: float = Field(1.2, ge=0.0, le=3.0)
+    steps: int = Field(20, ge=5, le=100)
+    seed: int = Field(42, ge=0, le=2**31 - 1)
+    snapshot_count: int = Field(8, ge=4, le=12)
+
+
 # --------------------------------------------------
 # Image utilities
 # --------------------------------------------------
 
 
 def tensor_to_png_b64(img, size=192):
-    """Convert an image tensor in [-1, 1] into a PNG base64 string."""
+    """Convert an image tensor in [-1, 1] into PNG base64."""
 
     arr = ((img.squeeze(0) + 1) / 2 * 255).round().clamp(0, 255).byte().cpu().numpy()
 
@@ -138,6 +150,7 @@ def run(digit, count, w, steps, seed, size):
     labels = torch.full((count,), digit, device=device, dtype=torch.long)
 
     with torch.no_grad():
+
         imgs = cond_ddim_sample(model, labels, steps=steps, w=w)
 
         probs = F.softmax(clf(imgs), dim=1)
@@ -169,6 +182,7 @@ def run(digit, count, w, steps, seed, size):
 
 @app.get("/api/info")
 def info():
+
     return {
         "status": "online",
         "model": "Class-Conditional MNIST Diffusion",
@@ -176,6 +190,7 @@ def info():
         "device": str(device),
         "classes": 10,
         "evaluation_available": True,
+        "visualization_available": True,
     }
 
 
@@ -188,6 +203,7 @@ def info():
 def generate(req: GenRequest):
 
     with lock:
+
         start = time.perf_counter()
 
         items, matches = run(req.digit, req.count, req.w, req.steps, req.seed, 192)
@@ -214,6 +230,7 @@ def compare(req: CompareRequest):
     ws = [min(max(float(w), 0.0), 3.0) for w in req.ws]
 
     with lock:
+
         start = time.perf_counter()
 
         results = []
@@ -237,6 +254,53 @@ def compare(req: CompareRequest):
         "count": req.count,
         "seconds": round(elapsed, 2),
         "results": results,
+    }
+
+
+# --------------------------------------------------
+# Diffusion visualization
+# --------------------------------------------------
+
+
+@app.post("/api/visualize")
+def visualize(req: VisualizeRequest):
+
+    with lock:
+
+        start = time.perf_counter()
+
+        torch.manual_seed(req.seed)
+
+        labels = torch.full((1,), req.digit, device=device, dtype=torch.long)
+
+        with torch.no_grad():
+
+            imgs, snapshots = cond_ddim_sample(
+                model,
+                labels,
+                steps=req.steps,
+                w=req.w,
+                return_intermediates=True,
+                snapshot_count=req.snapshot_count,
+            )
+
+        frames = [
+            {
+                "timestep": frame["timestep"],
+                "image": tensor_to_png_b64(frame["image"][0], 192),
+            }
+            for frame in snapshots
+        ]
+
+        elapsed = time.perf_counter() - start
+
+    return {
+        "digit": req.digit,
+        "steps": req.steps,
+        "guidance": req.w,
+        "seed": req.seed,
+        "seconds": round(elapsed, 2),
+        "snapshots": frames,
     }
 
 
@@ -296,7 +360,7 @@ def evaluate_model(req: EvalRequest):
         "diversity_mean_pairwise_l1": round(diversity, 4),
         "mean_pixel_std": round(pixel_std, 4),
         "seconds": round(elapsed, 2),
-        "images_per_second": round(req.count / elapsed, 2) if elapsed > 0 else 0,
+        "images_per_second": (round(req.count / elapsed, 2) if elapsed > 0 else 0),
         "items": items,
         "params": req.model_dump(),
     }
@@ -309,12 +373,12 @@ def evaluate_model(req: EvalRequest):
 
 @app.get("/")
 def index():
+
     return FileResponse(BASE / "static" / "index2.html")
 
 
 # --------------------------------------------------
 # Results directory
 # --------------------------------------------------
-
 
 app.mount("/results", StaticFiles(directory=str(BASE / "results")), name="results")
