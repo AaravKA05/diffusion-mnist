@@ -379,7 +379,7 @@ Top row: generated digits. Bottom row: the nearest training image of each. There
 
 ### 12. Deployed demo (Vercel + Modal, CPU)
 
-These numbers come from the live website. Settings for all three runs: digit 7, DDIM 20 steps, seed 42, 4 samples, guidance 1.2 (the comparison uses `w` = 0, 1.2 and 2). I did not control whether the backend was already awake, and each number is a single run.
+These screenshots and numbers come from the live website. Settings for all three runs: digit 7, DDIM 20 steps, seed 42, 4 samples, guidance 1.2 (the comparison uses `w` = 0, 1.2 and 2). I did not control whether the backend was already awake, and each number is a single run.
 
 | Run | Result |
 | --- | --- |
@@ -388,6 +388,12 @@ These numbers come from the live website. Settings for all three runs: digit 7, 
 | Compare, `w = 1.2` | 4 of 4 |
 | Compare, `w = 2` | 0 of 4 (read as 1, 3, 8, 0); total Compare time 5.04 s |
 | Evaluation tab | class consistency 100%, mean confidence 98.32%, diversity score 0.2706 (mean pairwise pixel L1 distance), pixel variation 0.2397, 1.72 s, 2.32 images per second |
+
+[![DiffusionLab Studio after generating](results/frontend_studio.png)](results/frontend_studio.png)
+
+[![Guidance comparison](results/frontend_compare.png)](results/frontend_compare.png)
+
+[![Model evaluation tab](results/frontend_evaluation.png)](results/frontend_evaluation.png)
 
 These are runs with only 4 samples. They show the same behaviour as the guidance results in section 7 (`w = 0` and `w = 2` mostly miss the digit, `w = 1.2` hits it) but they are not additional evidence. The diversity score is a simple indicator, not a perceptual metric or FID.
 
