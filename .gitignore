@@ -7,3 +7,14 @@ __pycache__/
 .ipynb_checkpoints/
 .DS_Store
 .gradio/
+# Local Cloudflare tunnel files
+cloudflared-current.log
+cloudflared-debug.log
+cloudflared.exe
+
+# Local backup
+sample_cond.py.backup
+start_demo.bat
+
+# Python test cache
+.pytest_cache/
