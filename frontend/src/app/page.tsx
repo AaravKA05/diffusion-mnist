@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+console.log("ACTIVE BACKEND:", API);
 const DB_NAME = "DiffusionLabDB";
 const STORE_NAME = "generations";
 
@@ -308,6 +309,23 @@ function StatCard({
 export default function Home() {
   const [activeTab, setActiveTab] = useState("Studio");
 
+  const [representationDigit, setRepresentationDigit] = useState(7);
+  const [representationTimestep, setRepresentationTimestep] = useState(200);
+  const [representationSteps, setRepresentationSteps] = useState(50);
+  const [representationGuidance, setRepresentationGuidance] = useState(1.2);
+  const [representationSeed, setRepresentationSeed] = useState(42);
+  const [representation, setRepresentation] = useState<any>(null);
+  const [coloredHeatmaps, setColoredHeatmaps] = useState<string[]>([]);
+  const [representationLoading, setRepresentationLoading] = useState(false);
+  const [representationError, setRepresentationError] = useState("");
+  const [selectedChannel, setSelectedChannel] = useState(0);
+  const [evolutionTimesteps, setEvolutionTimesteps] = useState([350, 250, 150, 50]);
+  const [evolutionData, setEvolutionData] = useState<any>(null);
+  const [evolutionLoading, setEvolutionLoading] = useState(false);
+  const [evolutionError, setEvolutionError] = useState("");
+  const [selectedEvolutionIndex, setSelectedEvolutionIndex] = useState(0);
+  const [coloredEvolutionImages, setColoredEvolutionImages] = useState<string[]>([]);
+
   const [digit, setDigit] = useState(7);
   const [count, setCount] = useState(8);
   const [guidance, setGuidance] = useState(1.2);
@@ -362,6 +380,10 @@ export default function Home() {
   const [visualizationError, setVisualizationError] = useState("");
   const [activeFrame, setActiveFrame] = useState(0);
 
+  const [isVisualPlaying, setIsVisualPlaying] = useState(false);
+  const [visualPlaybackSpeed, setVisualPlaybackSpeed] = useState(1);
+  const [visualLoop, setVisualLoop] = useState(false);
+
   const [interpDigit, setInterpDigit] = useState(7);
   const [interpGuidance, setInterpGuidance] = useState(1.2);
   const [interpSteps, setInterpSteps] = useState(30);
@@ -390,6 +412,32 @@ export default function Home() {
 
     return () => clearInterval(timer);
   }, [isPlaying, interpolation]);
+
+  useEffect(() => {
+    if (!isVisualPlaying || !visualization) return;
+
+    const totalFrames = visualization.snapshots.length;
+
+    if (totalFrames <= 1) {
+      setIsVisualPlaying(false);
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setActiveFrame((current) => {
+        if (current >= totalFrames - 1) {
+          if (visualLoop) return 0;
+
+          setIsVisualPlaying(false);
+          return current;
+        }
+
+        return current + 1;
+      });
+    }, 1000 / visualPlaybackSpeed);
+
+    return () => window.clearInterval(interval);
+  }, [isVisualPlaying, visualPlaybackSpeed, visualLoop, visualization]);
 
   useEffect(() => {
     let mounted = true;
@@ -725,6 +773,140 @@ export default function Home() {
     }
   }
 
+  function colorizeHeatmap(base64: string) {
+    return new Promise<string>((resolve) => {
+      const img = new Image();
+
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return resolve(`data:image/png;base64,${base64}`);
+
+        ctx.drawImage(img, 0, 0);
+
+        const imageData = ctx.getImageData(
+          0, 0, canvas.width, canvas.height
+        );
+
+        const data = imageData.data;
+
+        for (let i = 0; i < data.length; i += 4) {
+          const v = data[i] / 255;
+
+          data[i] = Math.max(0, Math.min(255, 255 * (1.5 - Math.abs(4 * v - 3))));
+          data[i + 1] = Math.max(0, Math.min(255, 255 * (1.5 - Math.abs(4 * v - 2))));
+          data[i + 2] = Math.max(0, Math.min(255, 255 * (1.5 - Math.abs(4 * v - 1))));
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+        resolve(canvas.toDataURL("image/png"));
+      };
+
+      img.src = `data:image/png;base64,${base64}`;
+    });
+  }
+
+  async function runRepresentation() {
+    setRepresentationLoading(true);
+    setRepresentationError("");
+    setRepresentation(null);
+    setSelectedChannel(0);
+
+    try {
+      const response = await fetch(`${API}/api/representation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          digit: representationDigit,
+          timestep: representationTimestep,
+          steps: representationSteps,
+          w: representationGuidance,
+          seed: representationSeed,
+        }),
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(
+          `Representation request failed (${response.status}): ${message}`
+        );
+      }
+
+      const data = await response.json();
+
+      if (!data.heatmaps || data.heatmaps.length === 0) {
+        throw new Error("No activation heatmaps returned by backend.");
+      }
+
+      setRepresentation(data);
+      const converted = await Promise.all(
+        data.heatmaps.map((item: any) => colorizeHeatmap(item.image))
+      );
+      setColoredHeatmaps(converted);
+    } catch (err) {
+      setRepresentationError(
+        err instanceof Error
+          ? err.message
+          : "Unable to load representations."
+      );
+    } finally {
+      setRepresentationLoading(false);
+    }
+  }
+
+  async function runRepresentationEvolution() {
+    setEvolutionLoading(true);
+    setEvolutionError("");
+    setEvolutionData(null);
+    setSelectedEvolutionIndex(0);
+
+    try {
+      const response = await fetch(`${API}/api/representation/evolution`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          digit: representationDigit,
+          timesteps: evolutionTimesteps,
+          steps: representationSteps,
+          w: representationGuidance,
+          seed: representationSeed,
+          channel: selectedChannel,
+        }),
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(
+          `Evolution request failed (${response.status}): ${message}`
+        );
+      }
+
+      const data = await response.json();
+
+      if (!data.evolution || data.evolution.length === 0) {
+        throw new Error("No timestep evolution data returned.");
+      }
+
+      setEvolutionData(data);
+      const convertedEvolution = await Promise.all(
+        data.evolution.map((item: any) => colorizeHeatmap(item.image))
+      );
+
+      setColoredEvolutionImages(convertedEvolution);
+    } catch (err) {
+      setEvolutionError(
+        err instanceof Error
+          ? err.message
+          : "Unable to load timestep evolution."
+      );
+    } finally {
+      setEvolutionLoading(false);
+    }
+  }
+
   async function runInterpolation() {
     setInterpolationLoading(true);
     setInterpolationError("");
@@ -867,6 +1049,7 @@ export default function Home() {
     ["◌", "Denoising Visualizer"],
     ["◈", "Noise Interpolation"],
     ["⚗", "Experiment Lab"],
+    ["◉", "Representation Explorer"],
   ];
 
   return (
@@ -1281,6 +1464,61 @@ export default function Home() {
                           </button>
                         </div>
 
+
+                        <div className="mt-5 space-y-4">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <button
+                              onClick={() => {
+                                if (!visualization) return;
+
+                                if (activeFrame >= visualization.snapshots.length - 1) {
+                                  setActiveFrame(0);
+                                }
+
+                                setIsVisualPlaying((playing) => !playing);
+                              }}
+                              className="rounded-xl bg-violet-600 px-5 py-2 text-sm font-semibold hover:bg-violet-500"
+                            >
+                              {isVisualPlaying ? "Pause" : "Play"}
+                            </button>
+
+                            <div className="flex items-center gap-2">
+                              <label className="text-xs text-slate-400">Speed</label>
+                              <select
+                                value={visualPlaybackSpeed}
+                                onChange={(e) => setVisualPlaybackSpeed(Number(e.target.value))}
+                                className="rounded-lg border border-white/10 bg-[#111522] px-3 py-2 text-sm"
+                              >
+                                <option value={0.5}>0.5x</option>
+                                <option value={1}>1x</option>
+                                <option value={2}>2x</option>
+                              </select>
+                            </div>
+
+                            <label className="flex items-center gap-2 text-xs text-slate-400">
+                              <input
+                                type="checkbox"
+                                checked={visualLoop}
+                                onChange={(e) => setVisualLoop(e.target.checked)}
+                                className="accent-violet-500"
+                              />
+                              Loop
+                            </label>
+                          </div>
+
+                          <input
+                            type="range"
+                            min="0"
+                            max={visualization.snapshots.length - 1}
+                            value={activeFrame}
+                            onChange={(e) => {
+                              setActiveFrame(Number(e.target.value));
+                              setIsVisualPlaying(false);
+                            }}
+                            className="w-full accent-violet-500"
+                          />
+                        </div>
+
                         <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
                           <div
                             className="h-full rounded-full bg-gradient-to-r from-blue-500 to-violet-500"
@@ -1353,6 +1591,332 @@ export default function Home() {
             </section>
           )}
 
+          {activeTab === "Representation Explorer" && (
+            <section className="space-y-6">
+              <div className="rounded-3xl border border-violet-400/20 bg-violet-500/[0.06] p-6 sm:p-8">
+                <p className="text-xs tracking-widest text-violet-300">
+                  MODEL INTERNALS / FEATURE ANALYSIS
+                </p>
+                <h2 className="mt-3 text-2xl font-semibold">
+                  Latent & Representation Explorer
+                </h2>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
+                  Explore internal UNet bottleneck activations during
+                  class-conditional DDIM sampling. Inspect feature channels,
+                  activation patterns and timestep-dependent representations.
+                </p>
+              </div>
+
+              {/* Representation Controls */}
+              <div className="mt-6 rounded-3xl border border-white/10 bg-[#111522]/80 p-6 space-y-6">
+                <div>
+                  <h3 className="text-lg font-semibold">Analysis Configuration</h3>
+                  <p className="mt-1 text-sm text-slate-400">
+                    Configure the input digit and diffusion sampling parameters.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div>
+                    <label className="text-sm text-slate-400">Select Digit</label>
+                    <select
+                      value={representationDigit}
+                      onChange={(e) => setRepresentationDigit(Number(e.target.value))}
+                      className="mt-2 w-full rounded-xl bg-[#1b2030] border border-white/10 p-3"
+                    >
+                      {Array.from({ length: 10 }, (_, i) => (
+                        <option key={i} value={i}>{i}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-sm text-slate-400">Timestep: {representationTimestep}</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="399"
+                      value={representationTimestep}
+                      onChange={(e) => setRepresentationTimestep(Number(e.target.value))}
+                      className="mt-4 w-full accent-violet-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm text-slate-400">DDIM Steps: {representationSteps}</label>
+                    <input
+                      type="range"
+                      min="5"
+                      max="100"
+                      value={representationSteps}
+                      onChange={(e) => setRepresentationSteps(Number(e.target.value))}
+                      className="mt-4 w-full accent-violet-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm text-slate-400">
+                      Guidance Scale: {representationGuidance.toFixed(1)}
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="3"
+                      step="0.1"
+                      value={representationGuidance}
+                      onChange={(e) => setRepresentationGuidance(Number(e.target.value))}
+                      className="mt-4 w-full accent-violet-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm text-slate-400">Random Seed</label>
+                  <input
+                    type="number"
+                    value={representationSeed}
+                    onChange={(e) => setRepresentationSeed(Number(e.target.value))}
+                    className="mt-2 w-full rounded-xl bg-[#1b2030] border border-white/10 p-3"
+                  />
+                </div>
+
+                <button
+                  onClick={runRepresentation}
+                  disabled={representationLoading}
+                  className="w-full rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 px-5 py-3 font-semibold transition"
+                >
+                  {representationLoading ? "Analyzing Features..." : "Explore Representations"}
+                </button>
+
+                {representationError && (
+                  <p className="text-sm text-red-400">{representationError}</p>
+                )}
+              </div>
+
+
+              {representation && (
+                <>
+                  <div className="mt-6 space-y-6">
+
+                    {/* Feature Statistics */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      {[
+                        ["Mean", representation.statistics.mean],
+                        ["Std Deviation", representation.statistics.std],
+                        ["Minimum", representation.statistics.min],
+                        ["Maximum", representation.statistics.max],
+                      ].map(([label, value]) => (
+                        <div
+                          key={String(label)}
+                          className="rounded-2xl border border-white/10 bg-[#111522] p-5"
+                        >
+                          <p className="text-xs uppercase tracking-widest text-slate-500">
+                            {label}
+                          </p>
+                          <p className="mt-2 text-xl font-semibold tabular-nums">
+                            {Number(value).toFixed(4)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Feature Information */}
+                    <div className="rounded-2xl border border-white/10 bg-[#111522] p-5">
+                      <h3 className="text-lg font-semibold">
+                        Bottleneck Feature Analysis
+                      </h3>
+                      <p className="mt-2 text-sm text-slate-400">
+                        Digit {representation.digit} · Requested timestep{" "}
+                        {representation.requested_timestep} · Actual timestep{" "}
+                        {representation.actual_timestep}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Feature shape: {representation.feature_shape.join(" × ")}
+                      </p>
+                    </div>
+
+                    {/* Channel Heatmaps */}
+                    <div className="rounded-3xl border border-white/10 bg-[#111522]/80 p-6">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-lg font-semibold">
+                            Activation Heatmaps
+                          </h3>
+                          <p className="text-sm text-slate-400 mt-1">
+                            Select a channel to inspect its spatial activation pattern.
+                          </p>
+                        </div>
+                        <span className="text-xs text-slate-500">
+                          {representation.heatmaps.length} channels
+                        </span>
+                      </div>
+
+                      {/* Activation Intensity Legend */}
+                      <div className="mt-5 rounded-xl border border-white/10 bg-[#1b2030] p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-sm font-medium text-slate-300">
+                            Activation Intensity
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            Normalized · 0 to 1
+                          </p>
+                        </div>
+
+                        <div
+                          className="h-4 w-full rounded-full"
+                          style={{
+                            background:
+                              "linear-gradient(to right, #0000ff, #00ffff, #ffff00, #ff0000)",
+                          }}
+                        />
+
+                        <div className="flex justify-between mt-2 text-xs text-slate-400">
+                          <span>Low</span>
+                          <span>Moderate</span>
+                          <span>High</span>
+                          <span>Very High</span>
+                        </div>
+                      </div>
+
+                      {/* Channel Grid */}
+                      <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+                        {representation.heatmaps.map((item: any) => (
+                          <button
+                            key={item.channel}
+                            onClick={() => setSelectedChannel(item.channel)}
+                            className={`rounded-xl border p-2 transition ${selectedChannel === item.channel
+                              ? "border-violet-500 bg-violet-500/10"
+                              : "border-white/10 bg-[#1b2030] hover:border-violet-400/50"
+                              }`}
+                          >
+                            <img
+                              src={coloredHeatmaps[item.channel]}
+                              alt={`Activation channel ${item.channel}`}
+                              className="w-full aspect-square rounded-lg object-contain bg-black"
+                            />
+                            <p className="mt-2 text-xs text-slate-400">
+                              Channel {item.channel}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Selected Channel */}
+                      {representation.heatmaps.find(
+                        (item: any) => item.channel === selectedChannel
+                      ) && (
+                          <div className="mt-6 border-t border-white/10 pt-6">
+                            <h4 className="text-sm font-semibold mb-3">
+                              Selected Channel: {selectedChannel}
+                            </h4>
+                            <div className="flex justify-center rounded-2xl bg-black/30 p-5">
+                              <img
+                                src={coloredHeatmaps[selectedChannel]}
+                                alt={`Selected activation channel ${selectedChannel}`}
+                                className="w-full max-w-sm rounded-xl"
+                              />
+                            </div>
+                          </div>
+                        )}
+                    </div>
+                  </div>
+
+                  {/* Timestep Feature Evolution */}
+                  <div className="rounded-3xl border border-cyan-400/20 bg-[#111522]/80 p-6 space-y-6">
+                    <div>
+                      <p className="text-xs tracking-widest text-cyan-300">
+                        TEMPORAL FEATURE ANALYSIS
+                      </p>
+                      <h3 className="mt-2 text-xl font-semibold">
+                        Timestep-wise Feature Evolution
+                      </h3>
+                      <p className="mt-2 text-sm text-slate-400">
+                        Compare how the selected UNet bottleneck channel changes
+                        across the DDIM denoising trajectory.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm text-slate-300">
+                        Selected channel: <strong>{selectedChannel}</strong>
+                      </p>
+
+                      <button
+                        onClick={runRepresentationEvolution}
+                        disabled={evolutionLoading}
+                        className="rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 px-5 py-3 text-sm font-semibold transition"
+                      >
+                        {evolutionLoading
+                          ? "Analyzing Evolution..."
+                          : "Analyze Feature Evolution"}
+                      </button>
+                    </div>
+
+                    {evolutionError && (
+                      <p className="text-sm text-red-400">
+                        {evolutionError}
+                      </p>
+                    )}
+
+                    {evolutionData && (
+                      <div className="space-y-5">
+                        <div className="flex flex-wrap gap-2">
+                          {evolutionData.evolution.map((item: any, index: number) => (
+                            <button
+                              key={item.timestep}
+                              onClick={() => setSelectedEvolutionIndex(index)}
+                              className={`rounded-lg border px-4 py-2 text-sm ${selectedEvolutionIndex === index
+                                ? "border-cyan-400 bg-cyan-500/15 text-cyan-300"
+                                : "border-white/10 bg-[#1b2030] text-slate-400"
+                                }`}
+                            >
+                              t = {item.timestep}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                          {evolutionData.evolution.map((item: any, index: number) => (
+                            <button
+                              key={item.timestep}
+                              onClick={() => setSelectedEvolutionIndex(index)}
+                              className={`rounded-2xl border p-4 text-left ${selectedEvolutionIndex === index
+                                ? "border-cyan-400 bg-cyan-500/10"
+                                : "border-white/10 bg-[#1b2030]"
+                                }`}
+                            >
+                              <p className="mb-3 text-sm font-semibold text-slate-300">
+                                Timestep {item.timestep}
+                              </p>
+                              <img
+                                src={coloredEvolutionImages[index]}
+                                alt={`Channel ${selectedChannel} at timestep ${item.timestep}`}
+                                className="w-full max-w-xs mx-auto rounded-xl"
+                              />
+                              <div className="mt-3 flex justify-between text-xs text-slate-400">
+                                <span>Mean: {item.mean.toFixed(4)}</span>
+                                <span>Std: {item.std.toFixed(4)}</span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="rounded-xl border border-white/10 bg-[#1b2030] p-4">
+                          <p className="text-sm text-slate-300">
+                            Digit {evolutionData.digit} · Channel {evolutionData.channel}
+                          </p>
+                          <p className="mt-2 text-xs text-slate-500">
+                            Seed: {evolutionData.seed} · Guidance: {evolutionData.guidance}
+                            · DDIM steps: {evolutionData.steps}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </section>
+          )}
 
           {activeTab === "Noise Interpolation" && (
             <section className="space-y-6">

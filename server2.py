@@ -19,7 +19,7 @@ from pathlib import Path
 
 import torch
 import torch.nn.functional as F
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -27,7 +27,7 @@ from PIL import Image
 from pydantic import BaseModel, Field
 
 import config
-from diffusion import device
+from diffusion import device, T
 from evaluate import Classifier
 from model import UNet
 from sample_cond import cond_ddim_sample
@@ -136,6 +136,27 @@ class ExperimentRequest(BaseModel):
     w: float = Field(1.2, ge=0.0, le=3.0)
     steps: int = Field(30, ge=5, le=100)
     seed: int = Field(42, ge=0, le=2**31 - 1)
+
+
+class RepresentationRequest(BaseModel):
+    digit: int = Field(7, ge=0, le=9)
+    timestep: int = Field(200, ge=0, le=399)
+    steps: int = Field(50, ge=5, le=100)
+    w: float = Field(1.2, ge=0.0, le=3.0)
+    seed: int = Field(42, ge=0, le=2**31 - 1)
+
+
+class RepresentationEvolutionRequest(BaseModel):
+    digit: int = Field(7, ge=0, le=9)
+    timesteps: list[int] = Field(
+        default=[350, 250, 150, 50],
+        min_length=2,
+        max_length=6,
+    )
+    steps: int = Field(50, ge=5, le=100)
+    w: float = Field(1.2, ge=0.0, le=3.0)
+    seed: int = Field(42, ge=0, le=2**31 - 1)
+    channel: int = Field(0, ge=0, le=255)
 
 
 # --------------------------------------------------
@@ -447,6 +468,188 @@ def visualize(req: VisualizeRequest):
         "seconds": round(elapsed, 2),
         "snapshots": frames,
     }
+
+
+@app.post("/api/representation")
+def get_representation(req: RepresentationRequest):
+
+    with lock:
+        start = time.perf_counter()
+
+        torch.manual_seed(req.seed)
+
+        labels = torch.tensor([req.digit], device=device, dtype=torch.long)
+
+        ts = list(reversed(torch.linspace(0, T - 1, req.steps).long().tolist()))
+
+        actual_timestep = min(ts, key=lambda value: abs(value - req.timestep))
+
+        with torch.no_grad():
+            initial_noise = torch.randn(
+                1, 1, config.IMG_SIZE, config.IMG_SIZE, device=device
+            )
+
+            _, features = cond_ddim_sample(
+                model,
+                labels,
+                steps=req.steps,
+                w=req.w,
+                initial_noise=initial_noise,
+                capture_timestep=actual_timestep,
+            )
+
+        if features is None:
+            raise HTTPException(
+                status_code=500, detail="Bottleneck feature capture failed."
+            )
+
+        feature_map = features[0]
+        channels, height, width = feature_map.shape
+
+        channel_maps = torch.nn.functional.interpolate(
+            feature_map.unsqueeze(1),
+            size=(64, 64),
+            mode="bilinear",
+            align_corners=False,
+        ).squeeze(1)
+
+        channel_maps = channel_maps.cpu()
+
+        channel_stats = {
+            "mean": float(feature_map.mean().item()),
+            "std": float(feature_map.std().item()),
+            "min": float(feature_map.min().item()),
+            "max": float(feature_map.max().item()),
+        }
+
+        heatmaps = []
+
+        for index in range(channels):
+            activation = channel_maps[index]
+            low = activation.min()
+            high = activation.max()
+
+            normalized = (activation - low) / (high - low + 1e-8)
+
+            heatmaps.append(
+                {
+                    "channel": index,
+                    "image": tensor_to_png_b64(
+                        normalized.unsqueeze(0) * 2 - 1,
+                        size=192,
+                    ),
+                }
+            )
+
+        return {
+            "digit": req.digit,
+            "requested_timestep": req.timestep,
+            "actual_timestep": actual_timestep,
+            "steps": req.steps,
+            "channels": channels,
+            "feature_shape": list(feature_map.shape),
+            "statistics": channel_stats,
+            "heatmaps": heatmaps,
+            "seconds": round(time.perf_counter() - start, 3),
+        }
+
+
+@app.post("/api/representation/evolution")
+def get_representation_evolution(req: RepresentationEvolutionRequest):
+    with lock:
+        start = time.perf_counter()
+
+        if any(t < 0 or t >= T for t in req.timesteps):
+            raise HTTPException(
+                status_code=400, detail=f"Timesteps must be between 0 and {T - 1}."
+            )
+
+        torch.manual_seed(req.seed)
+
+        labels = torch.tensor([req.digit], device=device, dtype=torch.long)
+
+        ts = list(reversed(torch.linspace(0, T - 1, req.steps).long().tolist()))
+
+        actual_timesteps = sorted(
+            set(
+                min(ts, key=lambda value: abs(value - requested))
+                for requested in req.timesteps
+            ),
+            reverse=True,
+        )
+
+        with torch.no_grad():
+            initial_noise = torch.randn(
+                1,
+                1,
+                config.IMG_SIZE,
+                config.IMG_SIZE,
+                device=device,
+            )
+
+            _, captured = cond_ddim_sample(
+                model,
+                labels,
+                steps=req.steps,
+                w=req.w,
+                initial_noise=initial_noise,
+                capture_timesteps=actual_timesteps,
+            )
+
+        if not captured or any(t not in captured for t in actual_timesteps):
+            raise HTTPException(
+                status_code=500,
+                detail="One or more timestep features could not be captured.",
+            )
+
+        feature_maps = [captured[t][0, req.channel] for t in actual_timesteps]
+
+        resized_maps = [
+            torch.nn.functional.interpolate(
+                feature.unsqueeze(0).unsqueeze(0),
+                size=(64, 64),
+                mode="bilinear",
+                align_corners=False,
+            )[0, 0].cpu()
+            for feature in feature_maps
+        ]
+
+        global_min = min(float(f.min()) for f in resized_maps)
+        global_max = max(float(f.max()) for f in resized_maps)
+
+        evolution = []
+
+        for timestep, activation in zip(actual_timesteps, resized_maps):
+            normalized = (activation - global_min) / (global_max - global_min + 1e-8)
+
+            evolution.append(
+                {
+                    "timestep": timestep,
+                    "image": tensor_to_png_b64(
+                        normalized.unsqueeze(0) * 2 - 1,
+                        size=192,
+                    ),
+                    "mean": float(activation.mean()),
+                    "std": float(activation.std()),
+                }
+            )
+
+        return {
+            "digit": req.digit,
+            "channel": req.channel,
+            "requested_timesteps": req.timesteps,
+            "actual_timesteps": actual_timesteps,
+            "steps": req.steps,
+            "seed": req.seed,
+            "guidance": req.w,
+            "feature_shape": list(captured[actual_timesteps[0]][0].shape),
+            "activation_range": {
+                "min": global_min,
+                "max": global_max,
+            },
+            "evolution": evolution,
+            "seconds": round(time.perf_counter() - start, 3),
+        }
 
 
 # --------------------------------------------------

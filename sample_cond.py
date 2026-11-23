@@ -4,6 +4,7 @@ import argparse
 
 import matplotlib.pyplot as plt
 import torch
+from torchgen import model
 from torchvision.utils import make_grid
 
 import config
@@ -20,6 +21,8 @@ def cond_ddim_sample(
     return_intermediates=False,
     snapshot_count=8,
     initial_noise=None,
+    capture_timestep=None,
+    capture_timesteps=None,
 ):
     """DDIM sampling with optional intermediate denoising snapshots."""
 
@@ -41,7 +44,9 @@ def cond_ddim_sample(
     ts = list(reversed(torch.linspace(0, T - 1, steps).long().tolist()))
 
     snapshots = []
-
+    captured_features = None
+    captured_timestep_features = {}
+    capture_targets = set(capture_timesteps or [])
     if return_intermediates:
         capture_indices = set(
             torch.linspace(0, len(ts) - 1, min(snapshot_count, len(ts)))
@@ -57,7 +62,16 @@ def cond_ddim_sample(
 
         tt = torch.full((n,), t, device=device, dtype=torch.long)
 
+        model.capture_features = capture_timestep == t or t in capture_targets
         eps_c = model(x, tt, labels)
+
+        if capture_timestep == t:
+            captured_features = model.feature_maps["bottleneck"].detach().cpu()
+        if t in capture_targets:
+            captured_timestep_features[t] = (
+                model.feature_maps["bottleneck"].detach().cpu()
+            )
+        model.capture_features = False
 
         if w == 1.0:
             eps = eps_c
@@ -78,10 +92,24 @@ def cond_ddim_sample(
                 {"timestep": t_prev, "image": x.clamp(-1, 1).detach().cpu()}
             )
 
+    model.capture_features = False
+
     final_images = x.clamp(-1, 1)
 
     if return_intermediates:
+        if capture_timesteps is not None:
+            return final_images, snapshots, captured_timestep_features
+
+        if capture_timestep is not None:
+            return final_images, snapshots, captured_features
+
         return final_images, snapshots
+
+    if capture_timesteps is not None:
+        return final_images, captured_timestep_features
+
+    if capture_timestep is not None:
+        return final_images, captured_features
 
     return final_images
 
