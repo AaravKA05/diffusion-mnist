@@ -1,26 +1,137 @@
 @import "tailwindcss";
 
+/* ------------------------------------------------------------------
+   DiffusionLab design tokens
+   Change a colour here and every bg-canvas / bg-surface / bg-surface-2
+   class in page.tsx follows.
+------------------------------------------------------------------ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #080b14;
+  --foreground: #f1f5f9;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-canvas: #080b14;
+  --color-surface: #111522;
+  --color-surface-2: #1b2030;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Numbers that change (seed, timings, counts) should not jump around */
+.tabular-nums,
+input[type="number"] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Smooth colour changes on every button, even ones without a transition class */
+button {
+  transition-property: color, background-color, border-color, box-shadow,
+    transform, filter, opacity;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+}
+
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+/* Clear keyboard focus ring (mouse clicks do not show it) */
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+a:focus-visible {
+  outline: 2px solid rgb(167 139 250);
+  outline-offset: 2px;
+}
+
+/* Range sliders: a little taller hit area */
+input[type="range"] {
+  height: 1.25rem;
+  cursor: pointer;
+}
+
+/* Thin, dark scrollbars (mobile tab strip, long panels) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.15) transparent;
+}
+
+/* ---------------- motion ---------------- */
+@keyframes dl-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dl-pulse {
+
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes dl-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.dl-fade-in {
+  animation: dl-fade-in 320ms ease-out both;
+}
+
+.dl-skeleton {
+  animation: dl-pulse 1.4s ease-in-out infinite;
+}
+
+.dl-spinner {
+  display: inline-block;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 9999px;
+  border: 2px solid rgb(167 139 250 / 0.3);
+  border-top-color: rgb(167 139 250);
+  animation: dl-spin 0.8s linear infinite;
+}
+
+/* Generated images fade in when they arrive */
+main img {
+  animation: dl-fade-in 320ms ease-out both;
+}
+
+/* Respect "reduce motion" in the OS settings */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

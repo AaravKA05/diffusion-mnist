@@ -5,6 +5,33 @@ import { useEffect, useState } from "react";
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 console.log("ACTIVE BACKEND:", API);
 const DB_NAME = "DiffusionLabDB";
+
+const TAB_TITLES: Record<string, string> = {
+  Studio: "Creative Studio",
+  "My Generations": "My Generations",
+  "Model Insights": "Model Insights",
+  Evaluation: "Model Evaluation",
+  "Denoising Visualizer": "Denoising Visualizer",
+  "Noise Interpolation": "Noise Interpolation",
+  "Experiment Lab": "Experiment Lab",
+  "Representation Explorer": "Representation Explorer",
+};
+
+const TAB_SUBTITLES: Record<string, string> = {
+  Studio: "Explore handwritten digit generation with diffusion models.",
+  "My Generations": "Your previously generated samples, saved in this browser.",
+  "Model Insights": "A summary of your generation activity and model configuration.",
+  Evaluation:
+    "Evaluate class consistency, confidence, diversity and inference speed.",
+  "Denoising Visualizer":
+    "Watch a noisy image progressively become a generated digit.",
+  "Noise Interpolation":
+    "Explore smooth transitions between two random noise inputs.",
+  "Experiment Lab":
+    "Run controlled experiments to understand how diffusion parameters affect generated images.",
+  "Representation Explorer":
+    "See which internal features the U-Net uses while it denoises a digit.",
+};
 const STORE_NAME = "generations";
 
 type GeneratedItem = {
@@ -261,7 +288,7 @@ function ImageCard({
 
   return (
     <div
-      className={`overflow-hidden rounded-xl border-2 bg-black/40 p-2 ${correct ? "border-emerald-500/70" : "border-red-500/70"
+      className={`dl-fade-in overflow-hidden rounded-xl border-2 bg-black/40 p-2 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-violet-950/40 ${correct ? "border-emerald-500/70" : "border-red-500/70"
         }`}
     >
       <img
@@ -270,7 +297,7 @@ function ImageCard({
         className="aspect-square w-full rounded-lg object-contain"
       />
 
-      <p className="mt-2 text-center text-[10px] text-slate-400">
+      <p className="mt-2 text-center text-xs text-slate-400">
         Read as {item.pred} · {(item.conf * 100).toFixed(1)}%
       </p>
 
@@ -286,6 +313,42 @@ function ImageCard({
   );
 }
 
+function SkeletonGrid({
+  count,
+  className = "grid grid-cols-2 gap-3 sm:grid-cols-3",
+}: {
+  count: number;
+  className?: string;
+}) {
+  return (
+    <div className={className} aria-hidden="true">
+      {Array.from({ length: count }, (_, i) => (
+        <div
+          key={i}
+          className="dl-skeleton rounded-xl border border-white/10 bg-black/30 p-2"
+          style={{ animationDelay: `${i * 80}ms` }}
+        >
+          <div className="aspect-square w-full rounded-lg bg-white/[0.06]" />
+          <div className="mx-auto mt-3 h-2.5 w-2/3 rounded-full bg-white/[0.06]" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LoadingNote({ text }: { text: string }) {
+  return (
+    <p
+      role="status"
+      aria-live="polite"
+      className="mt-5 flex items-center justify-center gap-2 text-sm text-violet-300"
+    >
+      <span className="dl-spinner" aria-hidden="true" />
+      {text}
+    </p>
+  );
+}
+
 function StatCard({
   label,
   value,
@@ -296,12 +359,12 @@ function StatCard({
   description: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-5">
-      <p className="text-[10px] font-semibold tracking-[0.2em] text-slate-500">
+    <div className="rounded-xl border border-white/[0.08] bg-white/[0.035] p-5">
+      <p className="text-xs font-semibold tracking-[0.2em] text-slate-400">
         {label}
       </p>
       <h3 className="mt-3 text-2xl font-semibold">{value}</h3>
-      <p className="mt-1 text-xs text-slate-500">{description}</p>
+      <p className="mt-1 text-xs text-slate-400">{description}</p>
     </div>
   );
 }
@@ -1053,50 +1116,55 @@ export default function Home() {
   ];
 
   return (
-    <main className="min-h-screen bg-[#080b14] text-white selection:bg-violet-500/30">
+    <main className="min-h-screen bg-canvas text-white selection:bg-violet-500/30">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -left-40 top-20 h-96 w-96 rounded-full bg-blue-600/10 blur-[130px]" />
+        <div className="absolute -left-40 top-20 h-96 w-96 rounded-full bg-indigo-600/10 blur-[130px]" />
         <div className="absolute right-0 top-40 h-96 w-96 rounded-full bg-violet-600/10 blur-[130px]" />
-        <div className="absolute bottom-0 left-1/2 h-80 w-80 rounded-full bg-cyan-500/5 blur-[130px]" />
+        <div className="absolute bottom-0 left-1/2 h-80 w-80 rounded-full bg-violet-500/5 blur-[130px]" />
       </div>
 
       <div className="relative mx-auto flex min-h-screen max-w-[1600px]">
         <aside className="hidden w-64 shrink-0 border-r border-white/[0.07] bg-white/[0.015] p-6 lg:flex lg:flex-col">
           <div className="mb-12 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 text-xl font-bold">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-xl font-bold">
               D
             </div>
             <div>
               <h1 className="text-lg font-semibold">DiffusionLab</h1>
-              <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">
+              <p className="whitespace-nowrap text-xs uppercase tracking-[0.12em] text-slate-400">
                 Generative Studio
               </p>
             </div>
           </div>
 
-          <p className="mb-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-600">
+          <p className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
             Workspace
           </p>
 
-          <nav className="space-y-2">
+          <nav className="space-y-1.5" role="tablist" aria-label="Workspace sections">
             {tabs.map(([icon, name]) => (
               <button
                 key={name}
+                role="tab"
+                aria-selected={activeTab === name}
                 onClick={() => setActiveTab(name)}
-                className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm transition ${activeTab === name
-                  ? "border border-violet-400/20 bg-violet-500/10 text-white"
-                  : "text-slate-500 hover:bg-white/5 hover:text-white"
+                className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left text-sm transition ${activeTab === name
+                  ? "border-violet-400/25 bg-violet-500/10 text-white shadow-[inset_3px_0_0_0_rgb(139_92_246)]"
+                  : "border-transparent text-slate-400 hover:bg-white/5 hover:text-white"
                   }`}
               >
-                <span className="text-lg">{icon}</span>
+                <span className="w-5 shrink-0 text-center text-lg" aria-hidden="true">
+                  {icon}
+                </span>
                 {name}
               </button>
             ))}
           </nav>
 
-          <div className="mt-auto rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="mt-auto rounded-xl border border-white/10 bg-white/[0.04] p-4">
             <div className="mb-3 flex items-center gap-2">
               <span
+                aria-hidden="true"
                 className={`h-2 w-2 rounded-full ${backendOnline === true
                   ? "bg-emerald-400"
                   : backendOnline === false
@@ -1113,27 +1181,33 @@ export default function Home() {
               </span>
             </div>
             <p className="text-sm font-medium">MNIST Model</p>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-slate-400">
               Conditional DDPM · EMA
             </p>
-            <p className="mt-3 text-[10px] text-slate-500">
+            <p className="mt-3 text-xs text-slate-400">
               FastAPI · PyTorch · DDIM
             </p>
           </div>
         </aside>
 
         <section className="min-w-0 flex-1 px-5 py-7 sm:px-8 lg:px-10">
-          <div className="mb-6 flex gap-2 overflow-x-auto lg:hidden">
+          <div
+            className="-mx-5 mb-6 flex gap-2 overflow-x-auto px-5 pb-1 sm:-mx-8 sm:px-8 lg:hidden"
+            role="tablist"
+            aria-label="Workspace sections"
+          >
             {tabs.map(([icon, name]) => (
               <button
                 key={name}
+                role="tab"
+                aria-selected={activeTab === name}
                 onClick={() => setActiveTab(name)}
                 className={`shrink-0 rounded-xl border px-3 py-2 text-xs ${activeTab === name
                   ? "border-violet-400/30 bg-violet-500/15 text-white"
                   : "border-white/10 bg-white/5 text-slate-400"
                   }`}
               >
-                {icon} {name}
+                <span aria-hidden="true">{icon}</span> {name}
               </button>
             ))}
           </div>
@@ -1144,40 +1218,17 @@ export default function Home() {
                 YOUR GENERATIVE WORKSPACE
               </p>
               <h2 className="text-3xl font-semibold sm:text-4xl">
-                {activeTab === "Studio"
-                  ? "Creative Studio"
-                  : activeTab === "My Generations"
-                    ? "My Generations"
-                    : activeTab === "Evaluation"
-                      ? "Model Evaluation"
-                      : activeTab === "Denoising Visualizer"
-                        ? "Denoising Visualizer"
-                        : activeTab === "Noise Interpolation"
-                          ? "Noise Interpolation"
-                          : activeTab === "Experiment Lab"
-                            ? "Experiment Lab"
-                            : "Model Insights"}
+                {TAB_TITLES[activeTab] ?? activeTab}
                 <span className="text-violet-400">.</span>
               </h2>
-              <p className="mt-2 text-sm text-slate-500">
-                {activeTab === "Studio"
-                  ? "Explore handwritten digit generation with diffusion models."
-                  : activeTab === "My Generations"
-                    ? "Your previously generated samples, saved in this browser."
-                    : activeTab === "Evaluation"
-                      ? "Evaluate class consistency, confidence, diversity and inference speed."
-                      : activeTab === "Denoising Visualizer"
-                        ? "Watch a noisy image progressively become a generated digit."
-                        : activeTab === "Noise Interpolation"
-                          ? "Explore smooth transitions between two random noise inputs."
-                          : activeTab === "Experiment Lab"
-                            ? "Run controlled experiments to understand how diffusion parameters affect generated images."
-                            : "A summary of your generation activity and model configuration."}
+              <p className="mt-2 text-sm text-slate-400">
+                {TAB_SUBTITLES[activeTab] ?? ""}
               </p>
             </div>
 
             <div className="flex items-center gap-3 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2.5">
               <span
+                aria-hidden="true"
                 className={`h-2 w-2 rounded-full ${backendOnline === true
                   ? "bg-emerald-400"
                   : backendOnline === false
@@ -1185,7 +1236,7 @@ export default function Home() {
                     : "bg-amber-400"
                   }`}
               />
-              <span className="text-xs text-slate-300">
+              <span className="text-xs text-slate-300" role="status" aria-live="polite">
                 {backendOnline === true
                   ? `Backend Online · ${backendDevice.toUpperCase()}`
                   : backendOnline === false
@@ -1197,7 +1248,7 @@ export default function Home() {
 
           {activeTab === "Denoising Visualizer" && (
             <section className="space-y-6">
-              <div className="rounded-3xl border border-violet-400/20 bg-violet-500/[0.06] p-6 sm:p-8">
+              <div className="rounded-2xl border border-violet-400/20 bg-violet-500/[0.06] p-6 sm:p-8">
                 <p className="text-xs tracking-widest text-violet-300">
                   DIFFUSION PROCESS / STEP BY STEP
                 </p>
@@ -1213,7 +1264,7 @@ export default function Home() {
               </div>
 
               <div className="grid grid-cols-1 gap-6 xl:grid-cols-[0.8fr_1.2fr]">
-                <div className="rounded-3xl border border-white/10 bg-[#111522]/80 p-6 sm:p-8">
+                <div className="rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
                   <p className="text-xs tracking-widest text-violet-300">
                     01 / CONFIGURATION
                   </p>
@@ -1231,7 +1282,9 @@ export default function Home() {
                         <button
                           key={i}
                           onClick={() => setVisualDigit(i)}
-                          className={`aspect-square rounded-xl border text-lg font-semibold ${visualDigit === i
+                          aria-pressed={visualDigit === i}
+                          aria-label={`Digit ${i}`}
+                          className={`aspect-square rounded-xl border transition text-lg font-semibold ${visualDigit === i
                             ? "border-violet-400 bg-violet-500/30 text-white"
                             : "border-white/10 bg-white/[0.035] text-slate-400 hover:bg-white/10"
                             }`}
@@ -1297,7 +1350,7 @@ export default function Home() {
                         }
                         className="w-full accent-violet-500"
                       />
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="mt-1 text-xs text-slate-400">
                         Number of intermediate sampling states to capture.
                       </p>
                     </div>
@@ -1321,7 +1374,7 @@ export default function Home() {
                               )
                             )
                           }
-                          className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none"
+                          className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none transition focus:border-violet-400/60 focus:ring-2 focus:ring-violet-500/30"
                         />
                         <button
                           onClick={() =>
@@ -1338,7 +1391,7 @@ export default function Home() {
                   <button
                     onClick={runVisualization}
                     disabled={visualizationLoading || backendOnline !== true}
-                    className="mt-8 w-full rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 py-4 font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                    className="mt-8 w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-4 font-semibold shadow-lg shadow-violet-900/30 transition enabled:hover:brightness-110 enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {visualizationLoading
                       ? "Generating sampling frames..."
@@ -1354,10 +1407,10 @@ export default function Home() {
                   )}
                 </div>
 
-                <div className="rounded-3xl border border-white/10 bg-[#111522]/80 p-6 sm:p-8">
+                <div className="rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <p className="text-xs tracking-widest text-cyan-300">
+                      <p className="text-xs tracking-widest text-violet-300">
                         02 / SAMPLING TIMELINE
                       </p>
                       <h3 className="mt-2 text-xl font-semibold">
@@ -1372,14 +1425,14 @@ export default function Home() {
                   </div>
 
                   {!visualization && !visualizationLoading && (
-                    <div className="mt-6 flex min-h-[380px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-black/20 p-8 text-center">
-                      <div className="flex h-28 w-28 items-center justify-center rounded-3xl border border-violet-400/20 bg-violet-500/10 text-6xl text-violet-300">
+                    <div className="mt-6 flex min-h-[380px] flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-black/20 p-8 text-center">
+                      <div className="flex h-28 w-28 items-center justify-center rounded-2xl border border-violet-400/20 bg-violet-500/10 text-6xl text-violet-300">
                         {visualDigit}
                       </div>
                       <h4 className="mt-6 text-lg font-medium">
                         Ready to visualize
                       </h4>
-                      <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">
+                      <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
                         Configure the sampling parameters and run the
                         visualizer. The first frame represents noise and the
                         final frame is the generated sample.
@@ -1388,18 +1441,17 @@ export default function Home() {
                   )}
 
                   {visualizationLoading && (
-                    <div className="mt-6 flex min-h-[380px] items-center justify-center rounded-2xl border border-white/10 bg-black/20 text-sm text-violet-300">
-                      Running the DDIM sampler and capturing intermediate
-                      states...
+                    <div className="dl-skeleton mt-6 flex min-h-[380px] flex-col items-center justify-center rounded-xl border border-white/10 bg-black/20 p-8 text-center">
+                      <LoadingNote text="Running the DDIM sampler and capturing intermediate states..." />
                     </div>
                   )}
 
                   {visualization && visualization.snapshots.length > 0 && (
                     <div className="mt-6">
-                      <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
+                      <div className="rounded-xl border border-white/10 bg-black/30 p-5">
                         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                           <div>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-slate-400">
                               CURRENT FRAME
                             </p>
                             <h4 className="mt-1 text-lg font-semibold">
@@ -1418,7 +1470,7 @@ export default function Home() {
                           </span>
                         </div>
 
-                        <div className="mx-auto max-w-[420px] rounded-2xl border border-white/10 bg-[#080b14] p-4">
+                        <div className="mx-auto max-w-[420px] rounded-xl border border-white/10 bg-canvas p-4">
                           <img
                             src={`data:image/png;base64,${visualization.snapshots[activeFrame]?.image ?? ""
                               }`}
@@ -1487,7 +1539,7 @@ export default function Home() {
                               <select
                                 value={visualPlaybackSpeed}
                                 onChange={(e) => setVisualPlaybackSpeed(Number(e.target.value))}
-                                className="rounded-lg border border-white/10 bg-[#111522] px-3 py-2 text-sm"
+                                className="rounded-lg border border-white/10 bg-surface px-3 py-2 text-sm"
                               >
                                 <option value={0.5}>0.5x</option>
                                 <option value={1}>1x</option>
@@ -1521,7 +1573,7 @@ export default function Home() {
 
                         <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
                           <div
-                            className="h-full rounded-full bg-gradient-to-r from-blue-500 to-violet-500"
+                            className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500"
                             style={{
                               width: `${((activeFrame + 1) /
                                 visualization.snapshots.length) *
@@ -1551,7 +1603,7 @@ export default function Home() {
                       </div>
 
                       <div className="mt-5">
-                        <p className="mb-3 text-xs font-semibold tracking-widest text-slate-500">
+                        <p className="mb-3 text-xs font-semibold tracking-widest text-slate-400">
                           ALL CAPTURED FRAMES · SELECT TO INSPECT
                         </p>
                         <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
@@ -1567,9 +1619,9 @@ export default function Home() {
                               <img
                                 src={`data:image/png;base64,${frame.image}`}
                                 alt={`Snapshot ${index + 1}`}
-                                className="aspect-square w-full rounded-lg bg-[#080b14] object-contain"
+                                className="aspect-square w-full rounded-lg bg-canvas object-contain"
                               />
-                              <p className="mt-2 text-[10px] text-slate-400">
+                              <p className="mt-2 text-xs text-slate-400">
                                 {index === 0
                                   ? "Initial noise"
                                   : index ===
@@ -1577,7 +1629,7 @@ export default function Home() {
                                     ? "Final image"
                                     : `Frame ${index + 1}`}
                               </p>
-                              <p className="text-[10px] text-slate-600">
+                              <p className="text-xs text-slate-500">
                                 t = {frame.timestep}
                               </p>
                             </button>
@@ -1593,7 +1645,7 @@ export default function Home() {
 
           {activeTab === "Representation Explorer" && (
             <section className="space-y-6">
-              <div className="rounded-3xl border border-violet-400/20 bg-violet-500/[0.06] p-6 sm:p-8">
+              <div className="rounded-2xl border border-violet-400/20 bg-violet-500/[0.06] p-6 sm:p-8">
                 <p className="text-xs tracking-widest text-violet-300">
                   MODEL INTERNALS / FEATURE ANALYSIS
                 </p>
@@ -1608,7 +1660,7 @@ export default function Home() {
               </div>
 
               {/* Representation Controls */}
-              <div className="mt-6 rounded-3xl border border-white/10 bg-[#111522]/80 p-6 space-y-6">
+              <div className="mt-6 rounded-2xl border border-white/10 bg-surface/80 p-6 space-y-6">
                 <div>
                   <h3 className="text-lg font-semibold">Analysis Configuration</h3>
                   <p className="mt-1 text-sm text-slate-400">
@@ -1622,7 +1674,7 @@ export default function Home() {
                     <select
                       value={representationDigit}
                       onChange={(e) => setRepresentationDigit(Number(e.target.value))}
-                      className="mt-2 w-full rounded-xl bg-[#1b2030] border border-white/10 p-3"
+                      className="mt-2 w-full rounded-xl bg-surface-2 border border-white/10 p-3"
                     >
                       {Array.from({ length: 10 }, (_, i) => (
                         <option key={i} value={i}>{i}</option>
@@ -1676,7 +1728,7 @@ export default function Home() {
                     type="number"
                     value={representationSeed}
                     onChange={(e) => setRepresentationSeed(Number(e.target.value))}
-                    className="mt-2 w-full rounded-xl bg-[#1b2030] border border-white/10 p-3"
+                    className="mt-2 w-full rounded-xl bg-surface-2 border border-white/10 p-3"
                   />
                 </div>
 
@@ -1708,9 +1760,9 @@ export default function Home() {
                       ].map(([label, value]) => (
                         <div
                           key={String(label)}
-                          className="rounded-2xl border border-white/10 bg-[#111522] p-5"
+                          className="rounded-xl border border-white/10 bg-surface p-5"
                         >
-                          <p className="text-xs uppercase tracking-widest text-slate-500">
+                          <p className="text-xs uppercase tracking-widest text-slate-400">
                             {label}
                           </p>
                           <p className="mt-2 text-xl font-semibold tabular-nums">
@@ -1721,7 +1773,7 @@ export default function Home() {
                     </div>
 
                     {/* Feature Information */}
-                    <div className="rounded-2xl border border-white/10 bg-[#111522] p-5">
+                    <div className="rounded-xl border border-white/10 bg-surface p-5">
                       <h3 className="text-lg font-semibold">
                         Bottleneck Feature Analysis
                       </h3>
@@ -1730,13 +1782,13 @@ export default function Home() {
                         {representation.requested_timestep} · Actual timestep{" "}
                         {representation.actual_timestep}
                       </p>
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="mt-1 text-xs text-slate-400">
                         Feature shape: {representation.feature_shape.join(" × ")}
                       </p>
                     </div>
 
                     {/* Channel Heatmaps */}
-                    <div className="rounded-3xl border border-white/10 bg-[#111522]/80 p-6">
+                    <div className="rounded-2xl border border-white/10 bg-surface/80 p-6">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <h3 className="text-lg font-semibold">
@@ -1746,18 +1798,18 @@ export default function Home() {
                             Select a channel to inspect its spatial activation pattern.
                           </p>
                         </div>
-                        <span className="text-xs text-slate-500">
+                        <span className="text-xs text-slate-400">
                           {representation.heatmaps.length} channels
                         </span>
                       </div>
 
                       {/* Activation Intensity Legend */}
-                      <div className="mt-5 rounded-xl border border-white/10 bg-[#1b2030] p-4">
+                      <div className="mt-5 rounded-xl border border-white/10 bg-surface-2 p-4">
                         <div className="flex items-center justify-between mb-3">
                           <p className="text-sm font-medium text-slate-300">
                             Activation Intensity
                           </p>
-                          <p className="text-xs text-slate-500">
+                          <p className="text-xs text-slate-400">
                             Normalized · 0 to 1
                           </p>
                         </div>
@@ -1786,7 +1838,7 @@ export default function Home() {
                             onClick={() => setSelectedChannel(item.channel)}
                             className={`rounded-xl border p-2 transition ${selectedChannel === item.channel
                               ? "border-violet-500 bg-violet-500/10"
-                              : "border-white/10 bg-[#1b2030] hover:border-violet-400/50"
+                              : "border-white/10 bg-surface-2 hover:border-violet-400/50"
                               }`}
                           >
                             <img
@@ -1809,7 +1861,7 @@ export default function Home() {
                             <h4 className="text-sm font-semibold mb-3">
                               Selected Channel: {selectedChannel}
                             </h4>
-                            <div className="flex justify-center rounded-2xl bg-black/30 p-5">
+                            <div className="flex justify-center rounded-xl bg-black/30 p-5">
                               <img
                                 src={coloredHeatmaps[selectedChannel]}
                                 alt={`Selected activation channel ${selectedChannel}`}
@@ -1822,9 +1874,9 @@ export default function Home() {
                   </div>
 
                   {/* Timestep Feature Evolution */}
-                  <div className="rounded-3xl border border-cyan-400/20 bg-[#111522]/80 p-6 space-y-6">
+                  <div className="rounded-2xl border border-violet-400/20 bg-surface/80 p-6 space-y-6">
                     <div>
-                      <p className="text-xs tracking-widest text-cyan-300">
+                      <p className="text-xs tracking-widest text-violet-300">
                         TEMPORAL FEATURE ANALYSIS
                       </p>
                       <h3 className="mt-2 text-xl font-semibold">
@@ -1844,7 +1896,7 @@ export default function Home() {
                       <button
                         onClick={runRepresentationEvolution}
                         disabled={evolutionLoading}
-                        className="rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 px-5 py-3 text-sm font-semibold transition"
+                        className="rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 px-5 py-3 text-sm font-semibold transition"
                       >
                         {evolutionLoading
                           ? "Analyzing Evolution..."
@@ -1866,8 +1918,8 @@ export default function Home() {
                               key={item.timestep}
                               onClick={() => setSelectedEvolutionIndex(index)}
                               className={`rounded-lg border px-4 py-2 text-sm ${selectedEvolutionIndex === index
-                                ? "border-cyan-400 bg-cyan-500/15 text-cyan-300"
-                                : "border-white/10 bg-[#1b2030] text-slate-400"
+                                ? "border-violet-400 bg-violet-500/15 text-violet-300"
+                                : "border-white/10 bg-surface-2 text-slate-400"
                                 }`}
                             >
                               t = {item.timestep}
@@ -1880,9 +1932,9 @@ export default function Home() {
                             <button
                               key={item.timestep}
                               onClick={() => setSelectedEvolutionIndex(index)}
-                              className={`rounded-2xl border p-4 text-left ${selectedEvolutionIndex === index
-                                ? "border-cyan-400 bg-cyan-500/10"
-                                : "border-white/10 bg-[#1b2030]"
+                              className={`rounded-xl border p-4 text-left ${selectedEvolutionIndex === index
+                                ? "border-violet-400 bg-violet-500/10"
+                                : "border-white/10 bg-surface-2"
                                 }`}
                             >
                               <p className="mb-3 text-sm font-semibold text-slate-300">
@@ -1901,11 +1953,11 @@ export default function Home() {
                           ))}
                         </div>
 
-                        <div className="rounded-xl border border-white/10 bg-[#1b2030] p-4">
+                        <div className="rounded-xl border border-white/10 bg-surface-2 p-4">
                           <p className="text-sm text-slate-300">
                             Digit {evolutionData.digit} · Channel {evolutionData.channel}
                           </p>
-                          <p className="mt-2 text-xs text-slate-500">
+                          <p className="mt-2 text-xs text-slate-400">
                             Seed: {evolutionData.seed} · Guidance: {evolutionData.guidance}
                             · DDIM steps: {evolutionData.steps}
                           </p>
@@ -1920,7 +1972,7 @@ export default function Home() {
 
           {activeTab === "Noise Interpolation" && (
             <section className="space-y-6">
-              <div className="rounded-3xl border border-violet-400/20 bg-violet-500/[0.06] p-6 sm:p-8">
+              <div className="rounded-2xl border border-violet-400/20 bg-violet-500/[0.06] p-6 sm:p-8">
                 <p className="text-xs font-semibold tracking-[0.2em] text-violet-300">
                   LATENT SPACE EXPLORATION
                 </p>
@@ -1935,7 +1987,7 @@ export default function Home() {
               </div>
 
               <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
-                <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
                   <h3 className="text-lg font-semibold">Interpolation Settings</h3>
 
                   <div className="mt-6 space-y-5">
@@ -1944,7 +1996,7 @@ export default function Home() {
                       <select
                         value={interpDigit}
                         onChange={(e) => setInterpDigit(Number(e.target.value))}
-                        className="mt-2 w-full rounded-xl border border-white/10 bg-[#111827] p-3 text-white"
+                        className="mt-2 w-full rounded-xl border border-white/10 bg-surface-2 p-3 text-white"
                       >
                         {Array.from({ length: 10 }, (_, i) => (
                           <option key={i} value={i}>{i}</option>
@@ -1991,7 +2043,7 @@ export default function Home() {
                           max="2147483647"
                           value={seedA}
                           onChange={(e) => setSeedA(Math.max(0, Math.min(2147483647, Number(e.target.value))))}
-                          className="mt-2 w-full rounded-xl border border-white/10 bg-[#111827] p-3 text-sm text-white"
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-surface-2 p-3 text-sm text-white"
                         />
                       </div>
                       <div>
@@ -2002,7 +2054,7 @@ export default function Home() {
                           max="2147483647"
                           value={seedB}
                           onChange={(e) => setSeedB(Math.max(0, Math.min(2147483647, Number(e.target.value))))}
-                          className="mt-2 w-full rounded-xl border border-white/10 bg-[#111827] p-3 text-sm text-white"
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-surface-2 p-3 text-sm text-white"
                         />
                       </div>
                     </div>
@@ -2038,14 +2090,14 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
                   {!interpolation ? (
                     <div className="flex min-h-[400px] flex-col items-center justify-center text-center">
                       <div className="text-5xl text-violet-400">◈</div>
                       <h3 className="mt-5 text-xl font-semibold">
                         Ready to interpolate
                       </h3>
-                      <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">
+                      <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
                         Generate frames to explore the transition between
                         two random noise inputs.
                       </p>
@@ -2057,7 +2109,7 @@ export default function Home() {
                           <h3 className="text-xl font-semibold">
                             Interpolation Results
                           </h3>
-                          <p className="mt-1 text-xs text-slate-500">
+                          <p className="mt-1 text-xs text-slate-400">
                             Target digit: {interpolation.digit}
                           </p>
                         </div>
@@ -2067,7 +2119,7 @@ export default function Home() {
                       </div>
 
                       <div className="mt-7 grid grid-cols-1 gap-5 sm:grid-cols-2">
-                        <div className="rounded-2xl border border-white/10 bg-[#080b14] p-4">
+                        <div className="rounded-xl border border-white/10 bg-canvas p-4">
                           <p className="mb-3 text-xs text-slate-400">Starting Noise · Seed {seedA}</p>
                           <img
                             src={`data:image/png;base64,${interpolation.frames[0].image}`}
@@ -2076,7 +2128,7 @@ export default function Home() {
                           />
                         </div>
 
-                        <div className="rounded-2xl border border-white/10 bg-[#080b14] p-4">
+                        <div className="rounded-xl border border-white/10 bg-canvas p-4">
                           <p className="mb-3 text-xs text-slate-400">Ending Noise · Seed {seedB}</p>
                           <img
                             src={`data:image/png;base64,${interpolation.frames[interpolation.frames.length - 1].image}`}
@@ -2086,7 +2138,7 @@ export default function Home() {
                         </div>
                       </div>
 
-                      <div className="mt-8 rounded-2xl border border-violet-400/20 bg-violet-500/[0.05] p-5">
+                      <div className="mt-8 rounded-xl border border-violet-400/20 bg-violet-500/[0.05] p-5">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <h4 className="font-semibold">Explore Transition</h4>
                           <span className="text-sm text-violet-300">
@@ -2094,7 +2146,7 @@ export default function Home() {
                           </span>
                         </div>
 
-                        <div className="mx-auto mt-5 max-w-sm rounded-2xl border border-white/10 bg-[#080b14] p-4">
+                        <div className="mx-auto mt-5 max-w-sm rounded-xl border border-white/10 bg-canvas p-4">
                           <img
                             src={`data:image/png;base64,${interpolation.frames[selectedInterpFrame]?.image}`}
                             alt={`Interpolation frame ${selectedInterpFrame + 1}`}
@@ -2196,7 +2248,7 @@ export default function Home() {
                         </div>
                       </div>
 
-                      <p className="mt-5 text-xs text-slate-500">
+                      <p className="mt-5 text-xs text-slate-400">
                         Inference time: {interpolation.inference_time}s
                       </p>
                     </div>
@@ -2228,7 +2280,7 @@ export default function Home() {
               </div>
 
               <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_0.85fr]">
-                <div className="rounded-3xl border border-white/10 bg-[#111522]/80 p-6 sm:p-8">
+                <div className="rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
                   <p className="text-xs tracking-widest text-violet-300">
                     01 / CONFIGURATION
                   </p>
@@ -2249,9 +2301,11 @@ export default function Home() {
                         <button
                           key={i}
                           onClick={() => setDigit(i)}
-                          className={`aspect-square rounded-xl border text-lg font-semibold ${digit === i
-                            ? "border-violet-400 bg-gradient-to-br from-violet-500 to-blue-600 text-white"
-                            : "border-white/10 bg-white/[0.035] text-slate-400"
+                          aria-pressed={digit === i}
+                          aria-label={`Digit ${i}`}
+                          className={`aspect-square rounded-xl border text-lg font-semibold transition ${digit === i
+                            ? "border-violet-400 bg-gradient-to-br from-violet-500 to-indigo-600 text-white"
+                            : "border-white/10 bg-white/[0.035] text-slate-400 hover:border-violet-400/40 hover:bg-white/10 hover:text-white"
                             }`}
                         >
                           {i}
@@ -2326,7 +2380,7 @@ export default function Home() {
                               )
                             )
                           }
-                          className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none"
+                          className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none transition focus:border-violet-400/60 focus:ring-2 focus:ring-violet-500/30"
                         />
                         <button
                           onClick={() =>
@@ -2345,7 +2399,7 @@ export default function Home() {
                     disabled={
                       loading || compareLoading || backendOnline !== true
                     }
-                    className="mt-9 w-full rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 py-4 font-semibold disabled:opacity-50"
+                    className="mt-9 w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-4 font-semibold shadow-lg shadow-violet-900/30 transition enabled:hover:brightness-110 enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {loading
                       ? "◌ Generating..."
@@ -2365,25 +2419,30 @@ export default function Home() {
                   )}
                 </div>
 
-                <div className="flex min-h-[480px] flex-col rounded-3xl border border-white/10 bg-[#111522]/70 p-6 sm:p-8">
-                  <p className="text-xs tracking-widest text-cyan-300">
+                <div className="flex min-h-[480px] flex-col rounded-2xl border border-white/10 bg-surface/70 p-6 sm:p-8">
+                  <p className="text-xs tracking-widest text-violet-300">
                     02 / OUTPUT
                   </p>
                   <h3 className="mb-6 mt-2 text-xl font-semibold">
                     Generation Preview
                   </h3>
 
-                  {images.length === 0 ? (
-                    <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-black/20 p-8 text-center">
-                      <div className="mb-6 flex h-24 w-24 items-center justify-center rounded-3xl border border-violet-400/20 bg-violet-500/10 text-5xl text-violet-300">
+                  {loading ? (
+                    <>
+                      <SkeletonGrid count={count} />
+                      <LoadingNote text={`Denoising ${count} sample${count === 1 ? "" : "s"} with ${steps} DDIM steps...`} />
+                    </>
+                  ) : images.length === 0 ? (
+                    <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-black/20 p-8 text-center">
+                      <div className="mb-6 flex h-24 w-24 items-center justify-center rounded-2xl border border-violet-400/20 bg-violet-500/10 text-5xl text-violet-300">
                         {digit}
                       </div>
                       <h4 className="text-lg font-medium">
                         Your canvas is ready
                       </h4>
-                      <p className="mt-2 max-w-xs text-sm text-slate-500">
-                        Generate handwritten samples using your trained
-                        diffusion model.
+                      <p className="mt-2 max-w-xs text-sm text-slate-400">
+                        Pick a digit, adjust the sliders, then press
+                        Generate Images to create new handwritten samples.
                       </p>
                     </div>
                   ) : (
@@ -2440,8 +2499,8 @@ export default function Home() {
                 </div>
               </div>
 
-              <section className="mt-8 rounded-3xl border border-white/10 bg-[#111522]/80 p-6 sm:p-8">
-                <p className="text-xs tracking-widest text-cyan-300">
+              <section className="mt-8 rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
+                <p className="text-xs tracking-widest text-violet-300">
                   03 / MODEL EXPERIMENTATION
                 </p>
                 <h3 className="mt-2 text-2xl font-semibold">
@@ -2480,7 +2539,7 @@ export default function Home() {
                   disabled={
                     compareLoading || loading || backendOnline !== true
                   }
-                  className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 py-4 font-semibold disabled:opacity-50"
+                  className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-4 font-semibold shadow-lg shadow-violet-900/30 transition enabled:hover:brightness-110 enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {compareLoading
                     ? "◌ Comparing..."
@@ -2488,9 +2547,21 @@ export default function Home() {
                 </button>
 
                 {compareLoading && (
-                  <p className="mt-5 text-center text-sm text-violet-300">
-                    Running three sampling experiments...
-                  </p>
+                  <div className="mt-8 space-y-6">
+                    <LoadingNote text="Running three sampling experiments..." />
+                    {[0, 1, 2].map((row) => (
+                      <div
+                        key={row}
+                        className="rounded-xl border border-white/10 bg-black/20 p-5"
+                      >
+                        <div className="dl-skeleton mb-4 h-5 w-40 rounded-full bg-white/[0.06]" />
+                        <SkeletonGrid
+                          count={Math.min(count, 8)}
+                          className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6"
+                        />
+                      </div>
+                    ))}
+                  </div>
                 )}
 
                 {compareResults.length > 0 && (
@@ -2508,7 +2579,7 @@ export default function Home() {
                       return (
                         <div
                           key={result.w}
-                          className="rounded-2xl border border-white/10 bg-black/20 p-5"
+                          className="rounded-xl border border-white/10 bg-black/20 p-5"
                         >
                           <div className="mb-4 flex justify-between">
                             <h4 className="text-xl font-bold">
@@ -2521,7 +2592,7 @@ export default function Home() {
 
                           <div className="mb-5 h-2 overflow-hidden rounded-full bg-white/10">
                             <div
-                              className="h-full bg-gradient-to-r from-blue-500 to-violet-500"
+                              className="h-full bg-gradient-to-r from-indigo-500 to-violet-500"
                               style={{ width: `${accuracy}%` }}
                             />
                           </div>
@@ -2554,7 +2625,7 @@ export default function Home() {
 
           {activeTab === "Experiment Lab" && (
             <section className="space-y-6">
-              <div className="rounded-3xl border border-violet-400/20 bg-[#111522]/80 p-6 sm:p-8">
+              <div className="rounded-2xl border border-violet-400/20 bg-surface/80 p-6 sm:p-8">
                 <p className="text-xs tracking-widest text-violet-300">
                   CONTROLLED DIFFUSION EXPERIMENTS
                 </p>
@@ -2583,7 +2654,7 @@ export default function Home() {
                         );
                         setExperimentResults([]);
                       }}
-                      className="w-full rounded-xl border border-white/10 bg-[#080b14] p-3 text-white"
+                      className="w-full rounded-xl border border-white/10 bg-canvas p-3 text-white"
                     >
                       <option value="guidance">CFG Guidance Scale</option>
                       <option value="steps">DDIM Sampling Steps</option>
@@ -2601,7 +2672,7 @@ export default function Home() {
                       max="9"
                       value={digit}
                       onChange={(e) => setDigit(Number(e.target.value))}
-                      className="w-full rounded-xl border border-white/10 bg-[#080b14] p-3 text-white"
+                      className="w-full rounded-xl border border-white/10 bg-canvas p-3 text-white"
                     />
                   </div>
 
@@ -2623,7 +2694,7 @@ export default function Home() {
                           Math.min(8, Math.max(1, Number(current) || 1))
                         );
                       }}
-                      className="w-full rounded-xl border border-white/10 bg-[#080b14] p-3 text-white"
+                      className="w-full rounded-xl border border-white/10 bg-canvas p-3 text-white"
                     />
                   </div>
 
@@ -2636,7 +2707,7 @@ export default function Home() {
                       value={experimentValues}
                       onChange={(e) => setExperimentValues(e.target.value)}
                       placeholder="0, 1.2, 2"
-                      className="w-full rounded-xl border border-white/10 bg-[#080b14] p-3 text-white"
+                      className="w-full rounded-xl border border-white/10 bg-canvas p-3 text-white"
                     />
                   </div>
 
@@ -2652,7 +2723,7 @@ export default function Home() {
                       value={guidance}
                       onChange={(e) => setGuidance(Number(e.target.value))}
                       disabled={experimentType === "guidance"}
-                      className="w-full rounded-xl border border-white/10 bg-[#080b14] p-3 text-white disabled:opacity-40"
+                      className="w-full rounded-xl border border-white/10 bg-canvas p-3 text-white disabled:opacity-40"
                     />
                   </div>
 
@@ -2667,7 +2738,7 @@ export default function Home() {
                       value={steps}
                       onChange={(e) => setSteps(Number(e.target.value))}
                       disabled={experimentType === "steps"}
-                      className="w-full rounded-xl border border-white/10 bg-[#080b14] p-3 text-white disabled:opacity-40"
+                      className="w-full rounded-xl border border-white/10 bg-canvas p-3 text-white disabled:opacity-40"
                     />
                   </div>
 
@@ -2681,7 +2752,7 @@ export default function Home() {
                       value={seed}
                       onChange={(e) => setSeed(Number(e.target.value))}
                       disabled={experimentType === "seeds"}
-                      className="w-full rounded-xl border border-white/10 bg-[#080b14] p-3 text-white disabled:opacity-40"
+                      className="w-full rounded-xl border border-white/10 bg-canvas p-3 text-white disabled:opacity-40"
                     />
                   </div>
                 </div>
@@ -2689,7 +2760,7 @@ export default function Home() {
                 <button
                   onClick={runExperiment}
                   disabled={experimentLoading || backendOnline !== true}
-                  className="mt-7 w-full rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 py-4 font-semibold disabled:opacity-50"
+                  className="mt-7 w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-4 font-semibold shadow-lg shadow-violet-900/30 transition enabled:hover:brightness-110 enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {experimentLoading
                     ? "Running Experiment..."
@@ -2703,9 +2774,7 @@ export default function Home() {
                 )}
 
                 {experimentLoading && (
-                  <p className="mt-4 text-center text-sm text-violet-300">
-                    Generating comparison samples...
-                  </p>
+                  <LoadingNote text="Generating comparison samples..." />
                 )}
               </div>
 
@@ -2761,7 +2830,7 @@ export default function Home() {
                     )[0];
 
                     return (
-                      <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/[0.06] p-5">
+                      <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/[0.06] p-5">
                         <p className="text-xs font-semibold tracking-widest text-emerald-300">
                           EXPERIMENT RECOMMENDATION
                         </p>
@@ -2798,7 +2867,7 @@ export default function Home() {
 
                   <div className="grid gap-5 lg:grid-cols-2">
                     {/* Match Rate Chart */}
-                    <div className="rounded-2xl border border-white/10 bg-[#111522]/80 p-5">
+                    <div className="rounded-xl border border-white/10 bg-surface/80 p-5">
                       <h4 className="mb-5 font-semibold">Match Rate Comparison</h4>
 
                       <div className="space-y-5">
@@ -2814,7 +2883,7 @@ export default function Home() {
                             </div>
                             <div className="h-3 overflow-hidden rounded-full bg-white/10">
                               <div
-                                className="h-full rounded-full bg-gradient-to-r from-blue-500 to-violet-500 transition-all"
+                                className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all"
                                 style={{ width: `${result.match_rate}%` }}
                               />
                             </div>
@@ -2824,7 +2893,7 @@ export default function Home() {
                     </div>
 
                     {/* Inference Time Chart */}
-                    <div className="rounded-2xl border border-white/10 bg-[#111522]/80 p-5">
+                    <div className="rounded-xl border border-white/10 bg-surface/80 p-5">
                       <h4 className="mb-5 font-semibold">Inference Time Comparison</h4>
 
                       <div className="space-y-5">
@@ -2860,7 +2929,7 @@ export default function Home() {
                   {experimentResults.map((result: any, index: number) => (
                     <div
                       key={index}
-                      className="rounded-2xl border border-white/10 bg-[#111522]/80 p-5"
+                      className="rounded-xl border border-white/10 bg-surface/80 p-5"
                     >
                       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                         <h4 className="text-lg font-semibold">
@@ -2913,18 +2982,18 @@ export default function Home() {
                           return metrics.map((metric) => (
                             <div
                               key={metric.label}
-                              className={`rounded-2xl border p-4 transition-all ${metric.isBest
+                              className={`rounded-xl border p-4 transition-all ${metric.isBest
                                 ? "border-emerald-400/50 bg-emerald-500/10 shadow-[0_0_15px_rgba(52,211,153,0.08)]"
                                 : "border-white/10 bg-white/[0.03]"
                                 }`}
                             >
-                              <p className="text-[10px] font-semibold tracking-[0.18em] text-slate-500">
+                              <p className="text-xs font-semibold tracking-[0.18em] text-slate-400">
                                 {metric.label}
                               </p>
                               <p className="mt-3 text-2xl font-bold text-white">
                                 {metric.value}
                               </p>
-                              <p className={`mt-1 text-xs ${metric.isBest ? "font-semibold text-emerald-400" : "text-slate-500"
+                              <p className={`mt-1 text-xs ${metric.isBest ? "font-semibold text-emerald-400" : "text-slate-400"
                                 }`}>
                                 {metric.description}
                               </p>
@@ -2972,7 +3041,7 @@ export default function Home() {
                     {savedExperiments.map((experiment) => (
                       <div
                         key={experiment.id}
-                        className="rounded-2xl border border-slate-700 bg-slate-900/50 p-5"
+                        className="rounded-xl border border-slate-700 bg-slate-900/50 p-5"
                       >
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div>
@@ -3069,7 +3138,7 @@ export default function Home() {
               <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h3 className="text-xl font-semibold">Generation History</h3>
-                  <p className="mt-1 text-sm text-slate-500">
+                  <p className="mt-1 text-sm text-slate-400">
                     {history.length} saved generations · {totalImages} images
                   </p>
                 </div>
@@ -3091,15 +3160,15 @@ export default function Home() {
               )}
 
               {historyLoading ? (
-                <div className="rounded-2xl border border-white/10 p-10 text-center text-slate-400">
+                <div className="rounded-xl border border-white/10 p-10 text-center text-slate-400">
                   Loading saved generations...
                 </div>
               ) : history.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-white/10 p-12 text-center">
+                <div className="rounded-2xl border border-dashed border-white/10 p-12 text-center">
                   <h3 className="text-lg font-semibold">
                     No generations saved yet
                   </h3>
-                  <p className="mt-2 text-sm text-slate-500">
+                  <p className="mt-2 text-sm text-slate-400">
                     Generate samples in Studio to start building your history.
                   </p>
                   <button
@@ -3114,14 +3183,14 @@ export default function Home() {
                   {history.map((record) => (
                     <div
                       key={record.id}
-                      className="rounded-3xl border border-white/10 bg-[#111522]/70 p-5 sm:p-7"
+                      className="rounded-2xl border border-white/10 bg-surface/70 p-5 sm:p-7"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <h4 className="text-lg font-semibold">
                             Digit {record.digit}
                           </h4>
-                          <p className="mt-1 text-xs text-slate-500">
+                          <p className="mt-1 text-xs text-slate-400">
                             {new Date(record.createdAt).toLocaleString()}
                           </p>
                         </div>
@@ -3199,7 +3268,7 @@ export default function Home() {
                         ))}
                       </div>
 
-                      <p className="mt-4 text-xs text-slate-500">
+                      <p className="mt-4 text-xs text-slate-400">
                         Classifier matches: {record.matches}/
                         {record.items.length}
                       </p>
@@ -3214,7 +3283,7 @@ export default function Home() {
             <section>
               <div className="mb-6">
                 <h3 className="text-xl font-semibold">Your Activity</h3>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 text-sm text-slate-400">
                   Statistics calculated from your saved generation history.
                 </p>
               </div>
@@ -3243,7 +3312,7 @@ export default function Home() {
               </div>
 
               <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
-                <div className="rounded-3xl border border-white/10 bg-[#111522]/80 p-6 sm:p-8">
+                <div className="rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
                   <p className="text-xs tracking-widest text-violet-300">
                     MODEL CONFIGURATION
                   </p>
@@ -3270,7 +3339,7 @@ export default function Home() {
                         key={label}
                         className="flex justify-between gap-3 border-b border-white/[0.06] pb-3"
                       >
-                        <span className="text-sm text-slate-500">{label}</span>
+                        <span className="text-sm text-slate-400">{label}</span>
                         <span className="text-right text-sm font-medium">
                           {value}
                         </span>
@@ -3279,8 +3348,8 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="rounded-3xl border border-white/10 bg-[#111522]/80 p-6 sm:p-8">
-                  <p className="text-xs tracking-widest text-cyan-300">
+                <div className="rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
+                  <p className="text-xs tracking-widest text-violet-300">
                     HOW TO INTERPRET
                   </p>
                   <h3 className="mt-2 text-xl font-semibold">
@@ -3312,7 +3381,7 @@ export default function Home() {
                     </div>
 
                     <div>
-                      <h4 className="font-medium text-cyan-300">
+                      <h4 className="font-medium text-violet-300">
                         Guidance Scale
                       </h4>
                       <p className="mt-2 text-sm leading-6 text-slate-400">
@@ -3325,7 +3394,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="mt-8 rounded-3xl border border-violet-400/20 bg-violet-500/[0.06] p-6">
+              <div className="mt-8 rounded-2xl border border-violet-400/20 bg-violet-500/[0.06] p-6">
                 <h3 className="font-semibold">Your Experiment Activity</h3>
                 <p className="mt-2 text-sm leading-6 text-slate-400">
                   {history.length === 0
@@ -3348,7 +3417,7 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="rounded-3xl border border-white/10 bg-[#111522]/80 p-6 sm:p-8">
+              <div className="rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
                 <p className="text-xs tracking-widest text-violet-300">
                   01 / EXPERIMENT CONFIGURATION
                 </p>
@@ -3364,7 +3433,7 @@ export default function Home() {
                     <select
                       value={evalDigit}
                       onChange={(e) => setEvalDigit(Number(e.target.value))}
-                      className="w-full rounded-xl border border-white/10 bg-[#080b14] px-4 py-3 text-sm"
+                      className="w-full rounded-xl border border-white/10 bg-canvas px-4 py-3 text-sm"
                     >
                       {Array.from({ length: 10 }, (_, i) => (
                         <option key={i} value={i}>
@@ -3446,7 +3515,7 @@ export default function Home() {
                 <button
                   onClick={runEvaluation}
                   disabled={evaluationLoading || backendOnline !== true}
-                  className="mt-8 w-full rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 py-4 font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                  className="mt-8 w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-4 font-semibold shadow-lg shadow-violet-900/30 transition enabled:hover:brightness-110 enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {evaluationLoading
                     ? "◌ Evaluating model..."
@@ -3465,7 +3534,7 @@ export default function Home() {
               {evaluation && (
                 <div className="mt-8 space-y-6">
                   <div>
-                    <p className="text-xs tracking-widest text-cyan-300">
+                    <p className="text-xs tracking-widest text-violet-300">
                       02 / EVALUATION RESULTS
                     </p>
                     <h3 className="mt-2 text-2xl font-semibold">
@@ -3510,7 +3579,7 @@ export default function Home() {
                     />
                   </div>
 
-                  <div className="rounded-2xl border border-white/10 bg-[#111522]/80 p-5">
+                  <div className="rounded-xl border border-white/10 bg-surface/80 p-5">
                     <h4 className="font-semibold">Evaluation Configuration</h4>
                     <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-5">
                       {[
@@ -3524,18 +3593,18 @@ export default function Home() {
                           key={String(label)}
                           className="rounded-xl border border-white/[0.07] bg-black/20 p-3"
                         >
-                          <p className="text-xs text-slate-500">{label}</p>
+                          <p className="text-xs text-slate-400">{label}</p>
                           <p className="mt-1 font-semibold">{value}</p>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  <div className="rounded-3xl border border-white/10 bg-[#111522]/80 p-6">
+                  <div className="rounded-2xl border border-white/10 bg-surface/80 p-6">
                     <h4 className="text-lg font-semibold">
                       Generated Evaluation Samples
                     </h4>
-                    <p className="mt-1 text-sm text-slate-500">
+                    <p className="mt-1 text-sm text-slate-400">
                       Green border indicates the classifier predicted the
                       requested digit. Red border indicates a mismatch.
                     </p>
@@ -3558,7 +3627,7 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-violet-400/20 bg-violet-500/[0.06] p-5">
+                  <div className="rounded-xl border border-violet-400/20 bg-violet-500/[0.06] p-5">
                     <h4 className="font-semibold">How to interpret results</h4>
                     <div className="mt-3 space-y-3 text-sm leading-6 text-slate-400">
                       <p>
@@ -3576,7 +3645,7 @@ export default function Home() {
                         does not directly measure generator accuracy.
                       </p>
                       <p>
-                        <strong className="text-cyan-300">Diversity:</strong>{" "}
+                        <strong className="text-violet-300">Diversity:</strong>{" "}
                         Mean pairwise pixel-space L1 distance. It is a simple
                         diversity indicator, not a perceptual metric or FID.
                       </p>
@@ -3594,7 +3663,7 @@ export default function Home() {
             </section>
           )}
 
-          <footer className="mt-10 border-t border-white/[0.07] py-6 text-xs text-slate-600">
+          <footer className="mt-10 border-t border-white/[0.07] py-6 text-xs text-slate-500">
             DiffusionLab · PyTorch + FastAPI + Next.js
           </footer>
         </section>
