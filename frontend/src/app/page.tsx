@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 
+import RecognitionTimeline from "./RecognitionTimeline";
+import SketchToDigit from "./SketchToDigit";
+
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 console.log("ACTIVE BACKEND:", API);
 const DB_NAME = "DiffusionLabDB";
@@ -15,6 +18,8 @@ const TAB_TITLES: Record<string, string> = {
   "Noise Interpolation": "Noise Interpolation",
   "Experiment Lab": "Experiment Lab",
   "Representation Explorer": "Representation Explorer",
+  "Recognition Timeline": "Recognition Timeline",
+  "Sketch to Digit": "Sketch to Digit",
 };
 
 const TAB_SUBTITLES: Record<string, string> = {
@@ -31,6 +36,10 @@ const TAB_SUBTITLES: Record<string, string> = {
     "Run controlled experiments to understand how diffusion parameters affect generated images.",
   "Representation Explorer":
     "See which internal features the U-Net uses while it denoises a digit.",
+  "Recognition Timeline":
+    "Find the sampling step where the digit becomes recognisable, and how guidance changes it.",
+  "Sketch to Digit":
+    "Draw a rough digit and let the diffusion model clean it up.",
 };
 const STORE_NAME = "generations";
 
@@ -1113,6 +1122,8 @@ export default function Home() {
     ["◈", "Noise Interpolation"],
     ["⚗", "Experiment Lab"],
     ["◉", "Representation Explorer"],
+    ["⟿", "Recognition Timeline"],
+    ["✎", "Sketch to Digit"],
   ];
 
   return (
@@ -1245,6 +1256,14 @@ export default function Home() {
               </span>
             </div>
           </header>
+
+          {activeTab === "Recognition Timeline" && (
+            <RecognitionTimeline api={API} backendOnline={backendOnline} />
+          )}
+
+          {activeTab === "Sketch to Digit" && (
+            <SketchToDigit api={API} backendOnline={backendOnline} />
+          )}
 
           {activeTab === "Denoising Visualizer" && (
             <section className="space-y-6">
