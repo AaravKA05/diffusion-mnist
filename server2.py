@@ -9,6 +9,8 @@ APIs:
     POST /api/compare
     POST /api/evaluate
     POST /api/visualize
+    POST /api/recognition   (when does the digit become recognisable?)
+    POST /api/sketch        (sketch to digit, SDEdit)
 """
 
 import base64
@@ -29,6 +31,7 @@ from pydantic import BaseModel, Field
 import config
 from diffusion import device, T
 from evaluate import Classifier
+from lab_features import decode_sketch, recognition_timeline, sketch_to_digit
 from model import UNet
 from sample_cond import cond_ddim_sample
 
@@ -159,6 +162,28 @@ class RepresentationEvolutionRequest(BaseModel):
     channel: int = Field(0, ge=0, le=255)
 
 
+class RecognitionRequest(BaseModel):
+    digit: int = Field(7, ge=0, le=9)
+    ws: list[float] = Field(
+        default_factory=lambda: [0.0, 1.2, 3.0],
+        min_length=1,
+        max_length=4,
+    )
+    steps: int = Field(30, ge=5, le=100)
+    count: int = Field(8, ge=1, le=16)
+    seed: int = Field(42, ge=0, le=2**31 - 1)
+
+
+class SketchRequest(BaseModel):
+    image: str = Field(..., min_length=20, max_length=3_000_000)
+    digit: int | None = Field(None, ge=0, le=9)
+    strength: float = Field(0.5, ge=0.1, le=1.0)
+    w: float = Field(1.2, ge=0.0, le=3.0)
+    steps: int = Field(50, ge=5, le=100)
+    count: int = Field(4, ge=1, le=8)
+    seed: int = Field(42, ge=0, le=2**31 - 1)
+
+
 # --------------------------------------------------
 # Image utilities
 # --------------------------------------------------
@@ -231,6 +256,8 @@ def info():
         "classes": 10,
         "evaluation_available": True,
         "visualization_available": True,
+        "recognition_available": True,
+        "sketch_available": True,
     }
 
 
@@ -711,6 +738,118 @@ def evaluate_model(req: EvalRequest):
         "images_per_second": (round(req.count / elapsed, 2) if elapsed > 0 else 0),
         "items": items,
         "params": req.model_dump(),
+    }
+
+
+# --------------------------------------------------
+# Recognition timeline
+# --------------------------------------------------
+
+
+@app.post("/api/recognition")
+def recognition(req: RecognitionRequest):
+
+    for w in req.ws:
+        if not 0.0 <= w <= 3.0:
+            raise HTTPException(
+                status_code=422, detail="Each w must be between 0 and 3."
+            )
+
+    with lock:
+
+        start = time.perf_counter()
+
+        series = []
+
+        for w in req.ws:
+            result = recognition_timeline(
+                model, clf, req.digit, w, req.steps, req.count, req.seed
+            )
+
+            final_matches = sum(1 for p in result["final_pred"] if p == req.digit)
+
+            series.append(
+                {
+                    "w": w,
+                    "points": result["points"],
+                    "lock_in_step": result["lock_in_step"],
+                    "final_matches": final_matches,
+                    "previews": [
+                        {
+                            "step": pv["step"],
+                            "timestep": pv["timestep"],
+                            "image": tensor_to_png_b64(pv["image"], 128),
+                            "pred": pv["pred"],
+                            "conf": pv["conf"],
+                        }
+                        for pv in result["previews"]
+                    ],
+                }
+            )
+
+        elapsed = time.perf_counter() - start
+
+    return {
+        "digit": req.digit,
+        "steps": len(series[0]["points"]),
+        "count": req.count,
+        "seed": req.seed,
+        "seconds": round(elapsed, 2),
+        "series": series,
+    }
+
+
+# --------------------------------------------------
+# Sketch to digit (SDEdit)
+# --------------------------------------------------
+
+
+@app.post("/api/sketch")
+def sketch(req: SketchRequest):
+
+    try:
+        sketch_tensor = decode_sketch(req.image)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    with lock:
+
+        start = time.perf_counter()
+
+        result = sketch_to_digit(
+            model,
+            clf,
+            sketch_tensor,
+            req.digit,
+            req.strength,
+            req.w,
+            req.steps,
+            req.count,
+            req.seed,
+        )
+
+        elapsed = time.perf_counter() - start
+
+    items = [
+        {"image": tensor_to_png_b64(im, 192), "pred": p, "conf": c}
+        for im, p, c in zip(result["images"], result["pred"], result["conf"])
+    ]
+
+    return {
+        "input": tensor_to_png_b64(sketch_tensor[0].cpu(), 192),
+        "noised": tensor_to_png_b64(result["noised"], 192),
+        "sketch_pred": result["sketch_pred"],
+        "sketch_conf": result["sketch_conf"],
+        "items": items,
+        "matches": (
+            sum(1 for item in items if item["pred"] == req.digit)
+            if req.digit is not None
+            else None
+        ),
+        "t_start": result["t_start"],
+        "steps_used": result["steps_used"],
+        "seconds": round(elapsed, 2),
+        "params": {k: v for k, v in req.model_dump().items() if k != "image"},
     }
 
 
