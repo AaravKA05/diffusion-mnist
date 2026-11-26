@@ -16,7 +16,9 @@ import {
   makeRng,
   partialTimesteps,
   randn,
+  reportStep,
   sampleDdim,
+  setStepReporter,
 } from "./sampler";
 
 const P = 32 * 32;
@@ -496,6 +498,7 @@ async function sketch(rt: Runtime, body: Body) {
     const tPrev = i + 1 < ts.length ? ts[i + 1] : -1;
     const r = await guidedEps(rt, x, count, t, labels, w);
     ddimStep(x, r.eps, rt.schedule.alpha_bar, t, tPrev);
+    reportStep();
   }
   const out = clampCopy(x);
   const probs = await classify(rt, out, count);
@@ -537,15 +540,65 @@ const HANDLERS: Record<string, (rt: Runtime, body: Body) => Promise<unknown>> = 
   "/api/sketch": sketch,
 };
 
+/**
+ * How many denoising steps a request will run, so the page can show
+ * "step 7 of 20". Estimates only; the bar never goes past 100%.
+ */
+export function estimateSteps(path: string, body: Body): number {
+  const n = (key: string, def: number) => {
+    const v = Number(body[key] ?? def);
+    return Number.isFinite(v) ? v : def;
+  };
+  const len = (key: string, def: number) => {
+    const v = body[key];
+    return Array.isArray(v) ? v.length : def;
+  };
+  switch (path) {
+    case "/api/generate":
+    case "/api/evaluate":
+    case "/api/visualize":
+      return n("steps", 20);
+    case "/api/representation":
+    case "/api/representation/evolution":
+      return n("steps", 50);
+    case "/api/compare":
+      return len("ws", 3) * n("steps", 20);
+    case "/api/interpolate":
+      return n("frames", 9) * n("steps", 30);
+    case "/api/recognition":
+      return len("ws", 3) * n("steps", 30);
+    case "/api/sketch":
+      return Math.max(2, Math.round(n("steps", 50) * n("strength", 0.5)));
+    case "/api/experiment": {
+      const values = Array.isArray(body.values) ? body.values.map(Number) : [];
+      if (body.experiment_type === "steps") {
+        return values.reduce((sum, v) => sum + Math.min(Math.max(Math.trunc(v), 5), 100), 0);
+      }
+      return values.length * n("steps", 30);
+    }
+    default:
+      return 0;
+  }
+}
+
 // One request at a time, like the server's lock
 let queue: Promise<unknown> = Promise.resolve();
 
-export function handleLocally(path: string, body: Body): Promise<unknown> {
+export function handleLocally(
+  path: string,
+  body: Body,
+  onStep?: () => void
+): Promise<unknown> {
   const handler = HANDLERS[path];
   if (!handler) return Promise.reject(new LocalApiError(404, `Unknown endpoint ${path}`));
   const job = queue.then(async () => {
     const rt = await getRuntime();
-    return handler(rt, body);
+    setStepReporter(onStep ?? null);
+    try {
+      return await handler(rt, body);
+    } finally {
+      setStepReporter(null);
+    }
   });
   queue = job.catch(() => undefined);
   return job;
