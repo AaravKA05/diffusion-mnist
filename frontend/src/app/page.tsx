@@ -11,9 +11,9 @@ import {
 } from "@/lib/engine/apiClient";
 import { preloadRuntime } from "@/lib/engine/runtime";
 
-import AboutFooter from "./AboutFooter";
 import ActivityToast from "./ActivityToast";
 import ImageLightbox from "./ImageLightbox";
+import LaunchScreen from "./LaunchScreen";
 import RecognitionTimeline from "./RecognitionTimeline";
 import SketchToDigit from "./SketchToDigit";
 
@@ -425,6 +425,8 @@ function StatCard({
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("Studio");
+  // Full-screen start page; the Studio loads behind it
+  const [showLaunch, setShowLaunch] = useState(true);
 
   const [representationDigit, setRepresentationDigit] = useState(7);
   const [representationTimestep, setRepresentationTimestep] = useState(200);
@@ -1193,12 +1195,18 @@ export default function Home() {
         <div className="absolute bottom-0 left-1/2 h-80 w-80 rounded-full bg-violet-500/5 blur-[130px]" />
       </div>
 
-      <div className="relative mx-auto flex min-h-screen max-w-[1600px]">
+      <div className="relative mx-auto flex min-h-screen max-w-[1600px]" inert={showLaunch}>
         <aside className="hidden w-64 shrink-0 border-r border-white/[0.07] bg-white/[0.015] p-6 lg:flex lg:flex-col">
           <div className="mb-12 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-xl font-bold">
+            <button
+              type="button"
+              onClick={() => setShowLaunch(true)}
+              aria-label="Back to the start screen"
+              title="Back to the start screen"
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-xl font-bold hover:brightness-110"
+            >
               D
-            </div>
+            </button>
             <div>
               <h1 className="text-lg font-semibold">DiffusionLab</h1>
               <p className="whitespace-nowrap text-xs uppercase tracking-[0.12em] text-slate-400">
@@ -1274,9 +1282,14 @@ export default function Home() {
         <section className="min-w-0 flex-1 px-5 py-7 sm:px-8 lg:px-10">
           {/* Phones and tablets: one dropdown instead of a long row of tabs */}
           <div className="mb-6 flex items-center gap-3 lg:hidden">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-xl font-bold">
+            <button
+              type="button"
+              onClick={() => setShowLaunch(true)}
+              aria-label="Back to the start screen"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-xl font-bold hover:brightness-110"
+            >
               D
-            </div>
+            </button>
             <label htmlFor="mobile-section" className="sr-only">
               Section
             </label>
@@ -3789,14 +3802,17 @@ export default function Home() {
             </section>
           )}
 
-          <AboutFooter
-            onOpenStudio={() => {
-              setActiveTab("Studio");
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
-          />
         </section>
       </div>
+      {showLaunch && (
+        <LaunchScreen
+          onEnter={() => {
+            setActiveTab("Studio");
+            setShowLaunch(false);
+            window.scrollTo({ top: 0 });
+          }}
+        />
+      )}
       <ActivityToast />
       <ImageLightbox />
     </main>
