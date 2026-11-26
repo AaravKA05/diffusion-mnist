@@ -7,6 +7,17 @@ import type { Runtime } from "./runtime";
 
 export const NULL_LABEL = 10;
 
+// Progress: every finished denoising step calls this (set by localApi)
+let stepReporter: (() => void) | null = null;
+
+export function setStepReporter(fn: (() => void) | null) {
+  stepReporter = fn;
+}
+
+export function reportStep() {
+  stepReporter?.();
+}
+
 // ---------------------------------------------------------------------------
 // Seeded random numbers (the browser cannot reproduce torch.manual_seed, so the
 // same seed gives different images than the laptop server, but the same seed
@@ -222,6 +233,7 @@ export async function sampleDdim(rt: Runtime, opts: SampleOptions) {
       captured.set(t, { data: r.bottleneck, shape: r.bottleneckShape });
     }
     const x0 = ddimStep(x, r.eps, rt.schedule.alpha_bar, t, tPrev);
+    reportStep();
     if (onStep) await onStep({ i, t, tPrev, x, x0 });
   }
 

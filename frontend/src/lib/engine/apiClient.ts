@@ -9,7 +9,7 @@
  * checks response.ok / response.json() / response.text() keeps working.
  */
 
-import { handleLocally, LocalApiError } from "./localApi";
+import { estimateSteps, handleLocally, LocalApiError } from "./localApi";
 
 export type EngineMode = "server" | "browser";
 
@@ -35,6 +35,48 @@ export function onEngineModeChange(fn: (mode: EngineMode) => void) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Activity: what is running right now, for the progress bar
+// ---------------------------------------------------------------------------
+
+export type Activity = {
+  mode: EngineMode;
+  label: string;
+  /** Finished denoising steps (browser mode only) */
+  done: number;
+  /** Expected steps, or null when unknown (server mode) */
+  total: number | null;
+};
+
+let activity: Activity | null = null;
+const activityListeners = new Set<(a: Activity | null) => void>();
+
+function setActivity(next: Activity | null) {
+  activity = next;
+  activityListeners.forEach((fn) => fn(next));
+}
+
+export function onActivityChange(fn: (a: Activity | null) => void) {
+  activityListeners.add(fn);
+  fn(activity);
+  return () => {
+    activityListeners.delete(fn);
+  };
+}
+
+const LABELS: Record<string, string> = {
+  "/api/generate": "Generating images",
+  "/api/compare": "Comparing guidance scales",
+  "/api/experiment": "Running experiment",
+  "/api/interpolate": "Interpolating noise",
+  "/api/visualize": "Capturing denoising steps",
+  "/api/representation": "Reading U-Net features",
+  "/api/representation/evolution": "Tracking feature evolution",
+  "/api/evaluate": "Evaluating the model",
+  "/api/recognition": "Tracing recognition",
+  "/api/sketch": "Cleaning up your sketch",
+};
+
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -47,25 +89,39 @@ async function runLocally(path: string, init?: RequestInit) {
   if (typeof init?.body === "string" && init.body) {
     body = JSON.parse(init.body);
   }
+  const total = estimateSteps(path, body);
+  let done = 0;
+  const label = LABELS[path] ?? "Working";
+  setActivity({ mode: "browser", label, done, total: total || null });
   try {
-    return jsonResponse(await handleLocally(path, body));
+    return jsonResponse(
+      await handleLocally(path, body, () => {
+        done += 1;
+        setActivity({ mode: "browser", label, done: Math.min(done, total || done), total: total || null });
+      })
+    );
   } catch (error) {
     if (error instanceof LocalApiError) {
       return jsonResponse({ detail: error.message }, error.status);
     }
     const message = error instanceof Error ? error.message : "Browser engine failed.";
     return jsonResponse({ detail: `Browser engine: ${message}` }, 500);
+  } finally {
+    setActivity(null);
   }
 }
 
 /** Drop-in replacement for fetch(`${API}${path}`, init). */
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   if (mode === "server") {
+    setActivity({ mode: "server", label: LABELS[path] ?? "Working", done: 0, total: null });
     try {
       return await fetch(`${API}${path}`, init);
     } catch {
       // Server vanished mid-session (laptop asleep, tunnel closed): fall back
       setEngineMode("browser");
+    } finally {
+      setActivity(null);
     }
   }
   return runLocally(path, init);
