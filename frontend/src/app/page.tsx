@@ -11,6 +11,7 @@ import {
 } from "@/lib/engine/apiClient";
 import { preloadRuntime } from "@/lib/engine/runtime";
 
+import AboutFooter from "./AboutFooter";
 import ActivityToast from "./ActivityToast";
 import ImageLightbox from "./ImageLightbox";
 import RecognitionTimeline from "./RecognitionTimeline";
@@ -1187,8 +1188,8 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-canvas text-white selection:bg-violet-500/30">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -left-40 top-20 h-96 w-96 rounded-full bg-indigo-600/10 blur-[130px]" />
-        <div className="absolute right-0 top-40 h-96 w-96 rounded-full bg-violet-600/10 blur-[130px]" />
+        <div className="absolute -left-40 top-20 h-96 w-96 rounded-full bg-[#2f4fa8]/15 blur-[130px]" />
+        <div className="absolute right-0 top-40 h-96 w-96 rounded-full bg-violet-600/[0.06] blur-[130px]" />
         <div className="absolute bottom-0 left-1/2 h-80 w-80 rounded-full bg-violet-500/5 blur-[130px]" />
       </div>
 
@@ -1220,7 +1221,7 @@ export default function Home() {
                       aria-selected={activeTab === name}
                       onClick={() => setActiveTab(name)}
                       className={`flex w-full items-center gap-3 rounded-xl border px-4 py-2.5 text-left text-sm transition ${activeTab === name
-                        ? "border-violet-400/25 bg-violet-500/10 text-white shadow-[inset_3px_0_0_0_rgb(139_92_246)]"
+                        ? "border-violet-400/25 bg-violet-500/10 text-white shadow-[inset_3px_0_0_0_rgb(255_90_74)]"
                         : "border-transparent text-slate-400 hover:bg-white/5 hover:text-white"
                         }`}
                     >
@@ -1242,20 +1243,20 @@ export default function Home() {
                 className={`h-2 w-2 rounded-full ${engineMode === "browser"
                   ? "bg-violet-400"
                   : backendOnline === true
-                  ? "bg-emerald-400"
-                  : backendOnline === false
-                    ? "bg-red-400"
-                    : "bg-amber-400"
+                    ? "bg-emerald-400"
+                    : backendOnline === false
+                      ? "bg-red-400"
+                      : "bg-amber-400"
                   }`}
               />
               <span className="text-xs text-slate-300">
                 {engineMode === "browser"
                   ? "Browser Mode"
                   : backendOnline === true
-                  ? "API Connected"
-                  : backendOnline === false
-                    ? "API Offline"
-                    : "Checking API..."}
+                    ? "API Connected"
+                    : backendOnline === false
+                      ? "API Offline"
+                      : "Checking API..."}
               </span>
             </div>
             <p className="text-sm font-medium">MNIST Model</p>
@@ -1325,20 +1326,20 @@ export default function Home() {
                 className={`h-2 w-2 rounded-full ${engineMode === "browser"
                   ? "bg-violet-400"
                   : backendOnline === true
-                  ? "bg-emerald-400"
-                  : backendOnline === false
-                    ? "bg-red-400"
-                    : "bg-amber-400"
+                    ? "bg-emerald-400"
+                    : backendOnline === false
+                      ? "bg-red-400"
+                      : "bg-amber-400"
                   }`}
               />
               <span className="text-xs text-slate-300" role="status" aria-live="polite">
                 {engineMode === "browser"
                   ? "Running in your browser"
                   : backendOnline === true
-                  ? `Backend Online · ${backendDevice.toUpperCase()}`
-                  : backendOnline === false
-                    ? "Backend Offline"
-                    : "Checking Backend..."}
+                    ? `Backend Online · ${backendDevice.toUpperCase()}`
+                    : backendOnline === false
+                      ? "Backend Offline"
+                      : "Checking Backend..."}
               </span>
             </div>
           </header>
@@ -3788,10 +3789,12 @@ export default function Home() {
             </section>
           )}
 
-          <footer className="mt-10 border-t border-white/[0.07] py-6 text-xs text-slate-500">
-            DiffusionLab · PyTorch + FastAPI + Next.js · ONNX Runtime Web
-            (browser mode)
-          </footer>
+          <AboutFooter
+            onOpenStudio={() => {
+              setActiveTab("Studio");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+          />
         </section>
       </div>
       <ActivityToast />

@@ -36,7 +36,7 @@ type TimelineResult = {
     series: TimelineSeries[];
 };
 
-// Validated categorical palette for the dark surface (#111522):
+// Validated categorical palette for the dark surface (#111b38, ink navy):
 // all four pass lightness, chroma, colour-blind separation and contrast checks.
 const SERIES_COLORS = ["#338ced", "#e76624", "#00a888", "#d28e05"];
 const W_OPTIONS = [0, 0.5, 1, 1.2, 2, 3];
@@ -109,7 +109,7 @@ function TimelineChart({ result }: { result: TimelineResult }) {
                             y={y(v) + 4}
                             textAnchor="end"
                             fontSize={11}
-                            fill="rgb(148 163 184)"
+                            fill="rgb(171 167 158)"
                         >
                             {Math.round(v * 100)}%
                         </text>
@@ -134,7 +134,7 @@ function TimelineChart({ result }: { result: TimelineResult }) {
                         y={CHART.height - CHART.bottom + 18}
                         textAnchor="middle"
                         fontSize={11}
-                        fill="rgb(148 163 184)"
+                        fill="rgb(171 167 158)"
                     >
                         {s}
                     </text>
@@ -144,7 +144,7 @@ function TimelineChart({ result }: { result: TimelineResult }) {
                     y={CHART.height - 4}
                     textAnchor="middle"
                     fontSize={11}
-                    fill="rgb(148 163 184)"
+                    fill="rgb(171 167 158)"
                 >
                     DDIM step (noise → image)
                 </text>
@@ -172,7 +172,7 @@ function TimelineChart({ result }: { result: TimelineResult }) {
                                     cy={y(lock.target_prob)}
                                     r={5}
                                     fill={SERIES_COLORS[i]}
-                                    stroke="#111522"
+                                    stroke="#111b38"
                                     strokeWidth={2}
                                 />
                             )}
@@ -180,7 +180,7 @@ function TimelineChart({ result }: { result: TimelineResult }) {
                                 x={x(last.step) + 8}
                                 y={labelY[i]}
                                 fontSize={11}
-                                fill="rgb(226 232 240)"
+                                fill="rgb(236 229 216)"
                             >
                                 w={s.w}
                             </text>
@@ -207,7 +207,7 @@ function TimelineChart({ result }: { result: TimelineResult }) {
                                 cy={y(h.point.target_prob)}
                                 r={4}
                                 fill={h.color}
-                                stroke="#111522"
+                                stroke="#111b38"
                                 strokeWidth={2}
                             />
                         )
