@@ -585,8 +585,9 @@ diffusion-mnist/
 ├── make_gif.py                # Denoising process GIF generation
 ├── app.py                     # Gradio demo
 │
-├── server.py                  # Earlier FastAPI backend
 ├── server2.py                 # Current FastAPI backend
+├── lab_features.py            # Recognition timeline and sketch to digit
+├── export_onnx.py             # Export models to ONNX for browser mode
 ├── compare.py                 # EMA vs non-EMA comparison
 ├── compare_ddim.py             # DDPM vs DDIM comparison
 ├── check_setup.py             # Environment and setup checks
@@ -598,10 +599,9 @@ diffusion-mnist/
 ├── preflight.py               # Pre-demo environment checks
 │
 ├── frontend/                   # Next.js, React and TypeScript frontend
-├── static/                     # Earlier web interface files
-├── notebooks/                  # Jupyter notebooks
+├── static/                     # index2.html, the page served by server2.py at /
 ├── results/                    # Experimental figures and outputs
-├── checkpoints/                # Local model checkpoints (ignored by Git)
+├── checkpoints/                # Model checkpoints (only these two are in Git)
 │   ├── cond_ema.pt             # Conditional diffusion model
 │   └── classifier.pt           # Evaluation classifier
 │
