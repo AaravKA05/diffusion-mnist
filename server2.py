@@ -23,8 +23,6 @@ import torch
 import torch.nn.functional as F
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 from PIL import Image
 from pydantic import BaseModel, Field
 
@@ -75,7 +73,7 @@ app.add_middleware(
         "https://diffusion-mnist.vercel.app",
         "https://diffusion-mnist-ah3vhn8js-aaravka05.vercel.app",
     ],
-    allow_credentials=True,
+    allow_credentials=False,  # no cookies or logins are used
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -854,18 +852,10 @@ def sketch(req: SketchRequest):
 
 
 # --------------------------------------------------
-# Original demo
+# Root: a short pointer to the API docs
 # --------------------------------------------------
 
 
 @app.get("/")
 def index():
-
-    return FileResponse(BASE / "static" / "index2.html")
-
-
-# --------------------------------------------------
-# Results directory
-# --------------------------------------------------
-
-app.mount("/results", StaticFiles(directory=str(BASE / "results")), name="results")
+    return {"name": "DiffusionLab API", "docs": "/docs"}
