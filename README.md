@@ -4,7 +4,7 @@ A full-stack interactive platform built around a **Denoising Diffusion Probabili
 
 DiffusionLab demonstrates how a neural network learns to reverse a gradual noise-adding process and generate handwritten digits from random Gaussian noise. The project combines the underlying diffusion model with an interactive web application for generation, visualization, experimentation, and feature analysis.
 
-**Live Frontend:** https://diffusion-mnist.vercel.app/
+**Live Site:** https://diffusion-mnist.vercel.app/ (always on: when the laptop backend is off, the model runs in your browser)
 
 **GitHub Repository:** https://github.com/AaravKA05/diffusion-mnist
 
@@ -19,6 +19,9 @@ DiffusionLab demonstrates how a neural network learns to reverse a gradual noise
 - Exponential Moving Average (EMA) of model weights.
 - Classifier-based evaluation of generated digits.
 - Interactive Next.js frontend and FastAPI backend.
+- **Hybrid browser mode:** the trained models are exported to ONNX and run in the visitor's browser with ONNX Runtime Web when no server is available, so the site works 24×7 without paid hosting.
+- **Recognition timeline:** classifies the model's clean-image guess at every sampling step to show *when* a digit becomes readable.
+- **Sketch to digit:** SDEdit-style clean-up of a hand-drawn digit, with no retraining.
 - VAE baseline, nearest-neighbour copy check, and per-digit diagnosis.
 
 ## DiffusionLab Features
@@ -30,6 +33,9 @@ DiffusionLab demonstrates how a neural network learns to reverse a gradual noise
 - **Experiment History:** Save and reuse previous experiments locally.
 - **Representation Explorer:** Inspect internal U-Net bottleneck feature maps.
 - **Feature Evolution:** Observe how selected feature channels change across diffusion timesteps.
+- **Recognition Timeline:** See at which sampling step the classifier starts reading the requested digit, for up to four guidance scales.
+- **Sketch to Digit:** Draw a digit with the mouse, a finger or a pen and let the model clean it up.
+- **Works without a server:** a progress bar shows each step while the model runs in the browser; any generated image can be clicked to view it large.
 
 ## Technology Stack
 
@@ -40,8 +46,9 @@ DiffusionLab demonstrates how a neural network learns to reverse a gradual noise
 | Backend | Python, FastAPI |
 | Frontend | Next.js, React, TypeScript |
 | Data Processing | NumPy, Matplotlib |
+| Browser Inference | ONNX, ONNX Runtime Web 1.23.2 (WebAssembly in a Web Worker) |
 | Testing | Pytest, HTTPX |
-| Deployment | Vercel, Cloudflare Quick Tunnel (temporary backend access) |
+| Deployment | Vercel (site and browser mode); optional laptop backend through a Cloudflare Quick Tunnel |
 
 **Model configuration:** 32 × 32 image resolution, 400 diffusion timesteps, and a class-conditional U-Net trained on MNIST using a Colab T4 GPU.
 
@@ -115,7 +122,7 @@ Tested with Python 3.13 and PyTorch 2.15 (CPU build).
 
 **Image size:** `config.py` holds `IMG_SIZE` and `BASE_CH`. The final results use `IMG_SIZE = 32` and `BASE_CH = 64`. For a quick run on a laptop CPU, use `IMG_SIZE = 16` and `BASE_CH = 32`.
 
-**Local inference checkpoints:** `checkpoints/cond_ema.pt` (conditional diffusion model) and `checkpoints/classifier.pt` (evaluation classifier) are required by the current `server2.py` API. These checkpoint files are ignored by Git, so ensure they are present locally before starting the backend.
+**Local inference checkpoints:** `checkpoints/cond_ema.pt` (conditional diffusion model) and `checkpoints/classifier.pt` (evaluation classifier) are required by `server2.py` and by `export_onnx.py`. These two files are committed to Git, so a fresh clone can run the backend straight away.
 
 To reproduce training from scratch, follow the training commands below; the 32x32 models took about 30 minutes each on a Colab T4.
 
@@ -150,7 +157,8 @@ Other local checkpoint files remain ignored by Git unless explicitly added.
 | `python preflight.py` | Check files, packages and ports before a local demo |
 | `python -m uvicorn server2:app --host 127.0.0.1 --port 8000` | Starts the current FastAPI backend |
 | `cd frontend && npm install && npm run dev` | Installs dependencies and starts the Next.js frontend |
-| `pytest -v tests/test_api.py` | Runs the automated backend API tests |
+| `pytest -v tests/test_api.py` | Runs the automated backend API tests (the backend must be running) |
+| `python export_onnx.py` | Exports the U-Net and classifier to `frontend/public/models/` for browser mode and checks them against PyTorch |
 
 All settings (image size, `T`, learning rate, epochs, EMA decay) live in `config.py`.
 
@@ -158,16 +166,15 @@ All settings (image size, `T`, learning rate, epochs, EMA decay) live in `config
 
 ## Full-Stack Architecture
 
-DiffusionLab follows a client-server architecture:
+DiffusionLab is **hybrid**: the same requests can be answered by a server or by the visitor's browser.
 
-- **Frontend:** Next.js and React provide the interactive user interface.
-- **Backend:** FastAPI handles API requests, model loading, image generation, and evaluation.
-- **Model:** A trained class-conditional U-Net performs diffusion-based image generation.
-- **Communication:** The frontend communicates with the backend through REST API endpoints.
+[![Hybrid architecture](results/arch_hybrid.png)](results/arch_hybrid.png)
 
-The backend loads the trained model and classifier from the `checkpoints/` directory.
-
-The frontend is deployed on Vercel, while the backend currently runs separately. Cloudflare Quick Tunnel can be used to expose the local backend temporarily for remote demonstrations.
+- **Frontend:** Next.js and React on Vercel.
+- **Server mode (laptop on):** FastAPI (`server2.py`) loads the PyTorch checkpoints and answers REST requests, reached through a Cloudflare Quick Tunnel. Fastest option.
+- **Browser mode (laptop off):** `export_onnx.py` exports the models to ONNX (`frontend/public/models/`). ONNX Runtime Web runs them with WebAssembly inside a Web Worker, and the DDIM loop, guidance and all eleven endpoints are ported to TypeScript (`frontend/src/lib/engine/`).
+- **Automatic switch:** on start-up the page asks the server for `/api/info` (4-second time-out). If it answers, requests go to the server; otherwise they run in the browser. If the server disappears mid-session, the next request falls back to the browser.
+- **Same JSON in both modes**, so the UI code does not care where the answer came from. The same seed gives different images in the two modes, because the browser cannot reproduce PyTorch's random numbers.
 
 ---
 
@@ -175,7 +182,7 @@ The frontend is deployed on Vercel, while the backend currently runs separately.
 
 DiffusionLab is an interactive web application built using Next.js and React. It provides an interface for exploring the trained class-conditional diffusion model and understanding its generation process.
 
-The application is organized into six major modules.
+The application has eight modules, grouped in the sidebar into **Create**, **Explore**, **Evaluate** and **History** (a dropdown menu on phones).
 
 ### 1. Generation Studio
 
@@ -222,6 +229,20 @@ The application is organized into six major modules.
 
 The Representation Explorer visualizes internal U-Net activations. It is not a VAE latent-space visualization.
 
+### 7. Recognition Timeline
+
+- At every DDIM step the sampler makes a guess of the final clean image; the CNN classifier reads that guess.
+- A line chart shows the probability of the requested digit at each step, for up to four guidance scales from the same starting noise.
+- Reports the step from which at least 90% of samples stay on the requested digit, or that they never settle.
+- Hover for exact values, or show the data as a table.
+
+### 8. Sketch to Digit
+
+- Draw a digit on a canvas; it is centred and resized like MNIST.
+- The model adds noise up to a chosen step (edit strength) and then denoises it (SDEdit).
+- Pick a target digit (uses guidance) or let the model decide.
+- Low strength keeps your shape; high strength lets the model redraw it.
+
 ---
 
 ### Local Development
@@ -245,6 +266,8 @@ npm run dev
 Open the frontend at:
 
 `http://localhost:3000`
+
+`npm install` also copies the ONNX Runtime Web files into `frontend/public/ort` (see `frontend/scripts/copy-ort.mjs`). To test browser mode locally, simply do not start the backend: the badge at the top shows **Running in your browser**.
 
 The backend Swagger UI is available at:
 
@@ -273,8 +296,10 @@ Interactive API documentation is available through Swagger UI at:
 | POST | `/api/representation` | Extracts and returns internal U-Net bottleneck representations. |
 | POST | `/api/representation/evolution` | Tracks selected feature-channel activations across timesteps. |
 | POST | `/api/evaluate` | Evaluates generated samples using the trained classifier. |
+| POST | `/api/recognition` | Classifier reading of the clean-image guess at every sampling step. |
+| POST | `/api/sketch` | Sketch to digit (SDEdit) with classifier verdicts. |
 
-The backend loads the trained conditional diffusion model and evaluation classifier from the `checkpoints/` directory.
+The backend loads the trained conditional diffusion model and evaluation classifier from the `checkpoints/` directory. The same eleven endpoints are implemented in the browser engine (`frontend/src/lib/engine/localApi.ts`) and return the same JSON.
 
 ---
 
@@ -297,7 +322,9 @@ The test suite is located in:
 - U-Net representation extraction.
 - Feature evolution across timesteps.
 - Generated image evaluation.
-- Invalid input handling and HTTP error responses.
+- Recognition timeline.
+- Sketch to digit, with and without a target digit.
+- Invalid input handling: digit 10 (status 422) and an empty sketch canvas (status 400).
 
 ### Running Tests
 
@@ -309,13 +336,11 @@ pytest -v tests/test_api.py
 
 ### Test Results
 
-The API test suite completed successfully:
-
-- **Total tests:** 10
-- **Passed:** 10
+- **Total tests:** 14
+- **Passed:** 14 (local backend with the trained model, 26 November 2026)
 - **Failed:** 0
 
-The tests validate backend endpoints through HTTP requests against the running FastAPI application.
+The first ten tests passed in 8.62 s; the four newer ones cover the recognition and sketch endpoints. The tests send HTTP requests to a running FastAPI server, so start the backend first (otherwise every test fails with `ConnectError`). The browser engine and the frontend are not covered by these tests; they were checked by hand and with scripted browser runs (Results section 15).
 
 ---
 
@@ -521,6 +546,51 @@ Settings for all three runs: digit 7, DDIM 20 steps, seed 42, 4 samples, guidanc
 
 These are runs with only 4 samples. They show the same behaviour as the guidance results in section 7 (`w = 0` and `w = 2` mostly miss the digit, `w = 1.2` hits it) but they are not additional evidence. The diversity score is a simple indicator, not a perceptual metric or FID.
 
+### 13. Recognition Timeline
+
+Digit 7, DDIM 30 steps, 8 samples per run, guidance 0, 1.2 and 3.0, seeds 7, 42 and 123 (each seed gives the same starting noise to all three guidance scales), trained model on the CPU.
+
+[![Recognition timeline](results/recognition_timeline.png)](results/recognition_timeline.png)
+
+| Seed | `w` | Step 1 | Peak | Step 30 | Final correct | Stays ≥ 90% from step |
+|---:|---:|---:|---:|---:|---:|---:|
+| 7 | 0.0 | 9% | 24% | 22% | 2 of 8 | never |
+| 42 | 0.0 | 3% | 12% | 12% | 1 of 8 | never |
+| 123 | 0.0 | 0% | 0% | 0% | 0 of 8 | never |
+| 7 | 1.2 | 97% | 98% | 94% | 8 of 8 | 1 |
+| 42 | 1.2 | 96% | 96% | 74% | 6 of 8 | never |
+| 123 | 1.2 | 92% | 93% | 57% | 5 of 8 | never |
+| 7 | 3.0 | 93% | 93% | 2% | 0 of 8 | never |
+| 42 | 3.0 | 100% | 100% | 0% | 0 of 8 | never |
+| 123 | 3.0 | 99% | 99% | 1% | 0 of 8 | never |
+
+- **A high early value is not a clear digit.** With guidance, the very first guess (made from pure noise) is a blurry average digit, and the classifier already reads it as a 7 with 92% to 100% probability.
+- **`w = 3.0` fails early.** The probability drops from about 97% to below 30% by step 5 and below 10% by step 10, and 0 of 24 final samples are 7s. This shows *when* the failure from section 9 happens (the first, high-noise third of sampling), not *why*.
+- **`w = 1.2`** stays high for about eight steps, then settles between 57% and 94% depending on the seed (19 of 24 correct). This is lower than section 7, but the settings differ (one digit, 30 steps, 24 samples), so the numbers are not comparable.
+- Only one digit, three seeds and a small classifier were used.
+
+### 14. Sketch to Digit
+
+One sketch of a 7 at edit strengths 0.3, 0.6 and 0.9 (target 7, `w = 1.2`, 50 full steps, seed 42). Columns: processed sketch, noised start, four results.
+
+[![Sketch to digit](results/sketch_to_digit.png)](results/sketch_to_digit.png)
+
+All 12 results, and 4 more with the digit left to the model, were read as 7 with more than 99% confidence. A mouse-drawn 7 on the laptop gave 4 of 4 correct in 1.64 s. These are single examples, not a systematic evaluation.
+
+### 15. Browser Mode: Correctness and Speed
+
+| Check | Setting | Result |
+|---|---|---|
+| ONNX export against PyTorch | 3 inputs, `t` = 0, 150, 399 | Largest difference 1.9e-6 (U-Net), 3.3e-6 (bottleneck), 3.8e-6 (classifier) |
+| Full sampling, browser against PyTorch | 8 images of digit 7, 20 steps, `w = 1.2`, same starting noise | Largest pixel difference 8.4e-5; 7 of 8 read as 7 |
+| All modules in browser mode | Every tab run once, no server | All ran without error |
+| Fallback | Server stopped during a session | Next request ran in the browser |
+| Speed, 2-core test machine | 8 images, 20 steps | PyTorch 2.4 s; browser 9.3 s (2 threads), 14.5 s (1 thread) |
+| Responsiveness | Same run, with and without the Web Worker | 60 frames per second with the worker, 0.7 without |
+| Speed, author's laptop | 4 images, 20 steps, browser mode | 2.8 s (single run) |
+
+The browser engine is about four times slower than PyTorch on the same CPU, so browser mode starts with lighter defaults (4 images, 20 steps). Phones were not measured. The first visit downloads about 25 MB (model and runtime).
+
 ### Side Note: Earlier 16x16 Runs on Laptop CPU
 
 Before moving to Colab I trained 16x16 models (`BASE_CH = 32`) on a laptop CPU.
@@ -535,10 +605,11 @@ Before moving to Colab I trained 16x16 models (`BASE_CH = 32`) on a laptop CPU.
 ## Limits and What I Do Not Claim
 
 - No FID or other standard image-quality metric: a small classifier is used as a rough check.
-- Not a production service or real-time inference system. The current backend runs separately on the local machine using CPU inference. Cloudflare Quick Tunnel can provide temporary public access, but there is no persistent hosted backend.
+- Not a production service. The PyTorch backend runs on a laptop CPU behind a temporary tunnel; when it is off, the site runs the model in the visitor's browser, which is slower on weak devices and was not measured on phones.
 - No claim that diffusion beats VAEs or GANs in general; the VAE here is small and untuned.
 - No significance claim for the guidance gain (3 seeds, one classifier).
-- No explanation for the rare digit 1 or for the failure at `w = 3.0`; both are open questions.
+- No explanation for the rare digit 1 or for the failure at `w = 3.0`; both are open questions (the recognition timeline only shows when the `w = 3.0` failure happens).
+- The recognition timeline and sketch results use one digit and a few seeds or sketches.
 - The public API has no login or rate limit.
 
 ---
@@ -562,6 +633,10 @@ Before moving to Colab I trained 16x16 models (`BASE_CH = 32`) on a laptop CPU.
 | `requirements.txt` problems | It was saved as UTF-16 by a PowerShell redirect and did not list gradio although `app.py` imports it | Save as UTF-8, check every import against the file |
 | Broken README layout | A missing closing code fence made the rest of the page appear inside a grey box on GitHub | Preview the README on GitHub after every structural edit |
 | Screenshot saved in the wrong place | Saving from the Snipping Tool created `results/results/` and a file named `resultsweb_demo.png.png` | Type the full path in the save dialog, check names with `dir` |
+| Free hosting failed | Render and Hugging Face did not work, Modal credits ran out, and other hosts need a card; free hosts without a card offer about 512 MB of RAM, too little for PyTorch | Exported the models to ONNX and run them in the browser (hybrid mode) |
+| Browser engine returned empty images | ONNX Runtime Web in a Web Worker takes ownership of input buffers, so arrays passed to the classifier were left "detached" | Pass a copy of the array to the model |
+| All API tests failed with `ConnectError` | The backend was not running when `pytest` started | Start `uvicorn server2:app` first, then run the tests in a second terminal |
+| Commit landed on `main` | The feature branch was not created before committing, so `git push` said the branch did not exist | Create the branch afterwards (`git checkout -b ...`); the commit moves with it |
 | Gradio share link failed | The tunnel client download was blocked by the antivirus (found only because `Get-FileHash` reported a virus warning) | Add a folder exception for that one folder, check the hash against Gradio's checksum, remove it later |
 
 ---
@@ -599,6 +674,10 @@ diffusion-mnist/
 ├── preflight.py               # Pre-demo environment checks
 │
 ├── frontend/                   # Next.js, React and TypeScript frontend
+│   ├── src/app/                # Pages and components (page.tsx, RecognitionTimeline, SketchToDigit, ...)
+│   ├── src/lib/engine/         # Browser engine: ONNX Runtime Web, DDIM, endpoints
+│   ├── public/models/          # unet.onnx, classifier.onnx, schedule.json
+│   └── scripts/copy-ort.mjs    # Copies ONNX Runtime Web files on npm install
 ├── static/                     # index2.html, the page served by server2.py at /
 ├── results/                    # Experimental figures and outputs
 ├── checkpoints/                # Model checkpoints (only these two are in Git)
@@ -623,6 +702,11 @@ diffusion-mnist/
 - Ho and Salimans (2022), [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598)
 - Nichol and Dhariwal (2021), [Improved Denoising Diffusion Probabilistic Models](https://arxiv.org/abs/2102.09672)
 - Kingma and Welling (2013), [Auto-Encoding Variational Bayes](https://arxiv.org/abs/1312.6114)
+- Meng et al. (2022), [SDEdit: Guided Image Synthesis and Editing with Stochastic Differential Equations](https://arxiv.org/abs/2108.01073)
+
+**Software**
+
+- [ONNX Runtime Web](https://onnxruntime.ai/docs/tutorials/web/) for in-browser inference
 
 **Dataset**
 
