@@ -124,6 +124,28 @@ main img {
   animation: dl-fade-in 320ms ease-out both;
 }
 
+/* Generated images can be clicked to open them large */
+main img[src^="data:image"] {
+  cursor: zoom-in;
+}
+
+[data-lightbox] img {
+  cursor: default;
+}
+
+@keyframes dl-indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
+.dl-indeterminate {
+  animation: dl-indeterminate 1.2s ease-in-out infinite;
+}
+
 /* Respect "reduce motion" in the OS settings */
 @media (prefers-reduced-motion: reduce) {
 

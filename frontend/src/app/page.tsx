@@ -11,11 +11,47 @@ import {
 } from "@/lib/engine/apiClient";
 import { preloadRuntime } from "@/lib/engine/runtime";
 
+import ActivityToast from "./ActivityToast";
+import ImageLightbox from "./ImageLightbox";
 import RecognitionTimeline from "./RecognitionTimeline";
 import SketchToDigit from "./SketchToDigit";
 
 console.log("ACTIVE BACKEND:", API);
 const DB_NAME = "DiffusionLabDB";
+
+// Sidebar sections. Order inside each group is the order shown.
+const TAB_GROUPS: { label: string; tabs: [string, string][] }[] = [
+  {
+    label: "Create",
+    tabs: [
+      ["◈", "Studio"],
+      ["✎", "Sketch to Digit"],
+    ],
+  },
+  {
+    label: "Explore",
+    tabs: [
+      ["◌", "Denoising Visualizer"],
+      ["◈", "Noise Interpolation"],
+      ["◉", "Representation Explorer"],
+      ["⟿", "Recognition Timeline"],
+    ],
+  },
+  {
+    label: "Evaluate",
+    tabs: [
+      ["◎", "Evaluation"],
+      ["⚗", "Experiment Lab"],
+    ],
+  },
+  {
+    label: "History",
+    tabs: [
+      ["▦", "My Generations"],
+      ["◉", "Model Insights"],
+    ],
+  },
+];
 
 const TAB_TITLES: Record<string, string> = {
   Studio: "Creative Studio",
@@ -1147,18 +1183,6 @@ export default function Home() {
   const matchRate =
     totalImages > 0 ? (totalMatches / totalImages) * 100 : 0;
 
-  const tabs = [
-    ["◈", "Studio"],
-    ["▦", "My Generations"],
-    ["◉", "Model Insights"],
-    ["◎", "Evaluation"],
-    ["◌", "Denoising Visualizer"],
-    ["◈", "Noise Interpolation"],
-    ["⚗", "Experiment Lab"],
-    ["◉", "Representation Explorer"],
-    ["⟿", "Recognition Timeline"],
-    ["✎", "Sketch to Digit"],
-  ];
 
   return (
     <main className="min-h-screen bg-canvas text-white selection:bg-violet-500/30">
@@ -1182,27 +1206,32 @@ export default function Home() {
             </div>
           </div>
 
-          <p className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-            Workspace
-          </p>
-
-          <nav className="space-y-1.5" role="tablist" aria-label="Workspace sections">
-            {tabs.map(([icon, name]) => (
-              <button
-                key={name}
-                role="tab"
-                aria-selected={activeTab === name}
-                onClick={() => setActiveTab(name)}
-                className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left text-sm transition ${activeTab === name
-                  ? "border-violet-400/25 bg-violet-500/10 text-white shadow-[inset_3px_0_0_0_rgb(139_92_246)]"
-                  : "border-transparent text-slate-400 hover:bg-white/5 hover:text-white"
-                  }`}
-              >
-                <span className="w-5 shrink-0 text-center text-lg" aria-hidden="true">
-                  {icon}
-                </span>
-                {name}
-              </button>
+          <nav className="space-y-6" aria-label="Workspace sections">
+            {TAB_GROUPS.map((group) => (
+              <div key={group.label}>
+                <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  {group.label}
+                </p>
+                <div className="space-y-1" role="tablist" aria-label={group.label}>
+                  {group.tabs.map(([icon, name]) => (
+                    <button
+                      key={name}
+                      role="tab"
+                      aria-selected={activeTab === name}
+                      onClick={() => setActiveTab(name)}
+                      className={`flex w-full items-center gap-3 rounded-xl border px-4 py-2.5 text-left text-sm transition ${activeTab === name
+                        ? "border-violet-400/25 bg-violet-500/10 text-white shadow-[inset_3px_0_0_0_rgb(139_92_246)]"
+                        : "border-transparent text-slate-400 hover:bg-white/5 hover:text-white"
+                        }`}
+                    >
+                      <span className="w-5 shrink-0 text-center text-lg" aria-hidden="true">
+                        {icon}
+                      </span>
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </nav>
 
@@ -1242,25 +1271,38 @@ export default function Home() {
         </aside>
 
         <section className="min-w-0 flex-1 px-5 py-7 sm:px-8 lg:px-10">
-          <div
-            className="-mx-5 mb-6 flex gap-2 overflow-x-auto px-5 pb-1 sm:-mx-8 sm:px-8 lg:hidden"
-            role="tablist"
-            aria-label="Workspace sections"
-          >
-            {tabs.map(([icon, name]) => (
-              <button
-                key={name}
-                role="tab"
-                aria-selected={activeTab === name}
-                onClick={() => setActiveTab(name)}
-                className={`shrink-0 rounded-xl border px-3 py-2 text-xs ${activeTab === name
-                  ? "border-violet-400/30 bg-violet-500/15 text-white"
-                  : "border-white/10 bg-white/5 text-slate-400"
-                  }`}
+          {/* Phones and tablets: one dropdown instead of a long row of tabs */}
+          <div className="mb-6 flex items-center gap-3 lg:hidden">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-xl font-bold">
+              D
+            </div>
+            <label htmlFor="mobile-section" className="sr-only">
+              Section
+            </label>
+            <div className="relative min-w-0 flex-1">
+              <select
+                id="mobile-section"
+                value={activeTab}
+                onChange={(event) => setActiveTab(event.target.value)}
+                className="w-full appearance-none rounded-xl border border-white/10 bg-surface px-4 py-3 pr-10 text-sm text-white outline-none transition focus:border-violet-400/60 focus:ring-2 focus:ring-violet-500/30"
               >
-                <span aria-hidden="true">{icon}</span> {name}
-              </button>
-            ))}
+                {TAB_GROUPS.map((group) => (
+                  <optgroup key={group.label} label={group.label}>
+                    {group.tabs.map(([icon, name]) => (
+                      <option key={name} value={name}>
+                        {icon} {name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              <span
+                className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                aria-hidden="true"
+              >
+                ▾
+              </span>
+            </div>
           </div>
 
           <header className="mb-10 flex flex-wrap items-center justify-between gap-4">
@@ -2344,7 +2386,11 @@ export default function Home() {
                 <StatCard
                   label="MODEL"
                   value="Conditional DDPM"
-                  description="PyTorch architecture"
+                  description={
+                    engineMode === "browser"
+                      ? "Running in your browser (ONNX)"
+                      : "PyTorch architecture"
+                  }
                 />
                 <StatCard
                   label="SAMPLING"
@@ -3743,10 +3789,13 @@ export default function Home() {
           )}
 
           <footer className="mt-10 border-t border-white/[0.07] py-6 text-xs text-slate-500">
-            DiffusionLab · PyTorch + FastAPI + Next.js
+            DiffusionLab · PyTorch + FastAPI + Next.js · ONNX Runtime Web
+            (browser mode)
           </footer>
         </section>
       </div>
+      <ActivityToast />
+      <ImageLightbox />
     </main>
   );
 }
