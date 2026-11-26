@@ -2,10 +2,18 @@
 
 import { useEffect, useState } from "react";
 
+import {
+  API,
+  apiFetch,
+  onEngineModeChange,
+  setEngineMode,
+  type EngineMode,
+} from "@/lib/engine/apiClient";
+import { preloadRuntime } from "@/lib/engine/runtime";
+
 import RecognitionTimeline from "./RecognitionTimeline";
 import SketchToDigit from "./SketchToDigit";
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 console.log("ACTIVE BACKEND:", API);
 const DB_NAME = "DiffusionLabDB";
 
@@ -426,6 +434,7 @@ export default function Home() {
   const [historyError, setHistoryError] = useState("");
 
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
+  const [engineMode, setEngineModeState] = useState<EngineMode | null>(null);
   const [backendDevice, setBackendDevice] = useState("Checking...");
   const [imageSize, setImageSize] = useState<number | null>(null);
 
@@ -540,12 +549,33 @@ export default function Home() {
     };
   }, []);
 
+  // Track whether requests go to the laptop server or run in this browser.
+  // The first time we land in browser mode, use lighter Studio defaults.
+  useEffect(() => {
+    let lightened = false;
+    return onEngineModeChange((next) => {
+      setEngineModeState(next);
+      if (next === "browser") {
+        setBackendDevice("browser");
+        if (!lightened) {
+          lightened = true;
+          setSteps((value) => (value === 50 ? 20 : value));
+          setCount((value) => (value === 8 ? 4 : value));
+        }
+      }
+    });
+  }, []);
+
   useEffect(() => {
     let mounted = true;
 
     async function checkBackend() {
       try {
-        const response = await fetch(`${API}/api/info`);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 4000);
+        const response = await fetch(`${API}/api/info`, {
+          signal: controller.signal,
+        }).finally(() => clearTimeout(timer));
 
         if (!response.ok) {
           throw new Error("Backend unavailable");
@@ -554,15 +584,19 @@ export default function Home() {
         const data = await response.json();
 
         if (mounted) {
+          setEngineMode("server");
           setBackendOnline(true);
           setBackendDevice(data.device || "Unknown");
           setImageSize(data.img_size ?? null);
         }
       } catch {
+        // Laptop server not reachable: run the model in this browser instead
         if (mounted) {
-          setBackendOnline(false);
-          setBackendDevice("Unavailable");
-          setImageSize(null);
+          setEngineMode("browser");
+          setBackendOnline(true);
+          setBackendDevice("browser");
+          setImageSize(32);
+          preloadRuntime();
         }
       }
     }
@@ -582,7 +616,7 @@ export default function Home() {
     setStatus("Connecting to diffusion model...");
 
     try {
-      const response = await fetch(`${API}/api/generate`, {
+      const response = await apiFetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -645,7 +679,7 @@ export default function Home() {
     setCompareTime(null);
 
     try {
-      const response = await fetch(`${API}/api/compare`, {
+      const response = await apiFetch("/api/compare", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -696,7 +730,7 @@ export default function Home() {
         throw new Error("Enter 2 to 4 valid comma-separated values.");
       }
 
-      const response = await fetch(`${API}/api/experiment`, {
+      const response = await apiFetch("/api/experiment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -809,7 +843,7 @@ export default function Home() {
     setActiveFrame(0);
 
     try {
-      const response = await fetch(`${API}/api/visualize`, {
+      const response = await apiFetch("/api/visualize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -888,7 +922,7 @@ export default function Home() {
     setSelectedChannel(0);
 
     try {
-      const response = await fetch(`${API}/api/representation`, {
+      const response = await apiFetch("/api/representation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -936,7 +970,7 @@ export default function Home() {
     setSelectedEvolutionIndex(0);
 
     try {
-      const response = await fetch(`${API}/api/representation/evolution`, {
+      const response = await apiFetch("/api/representation/evolution", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -987,7 +1021,7 @@ export default function Home() {
     setIsPlaying(false);
 
     try {
-      const response = await fetch(`${API}/api/interpolate`, {
+      const response = await apiFetch("/api/interpolate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1032,7 +1066,7 @@ export default function Home() {
     setEvaluation(null);
 
     try {
-      const response = await fetch(`${API}/api/evaluate`, {
+      const response = await apiFetch("/api/evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1176,7 +1210,9 @@ export default function Home() {
             <div className="mb-3 flex items-center gap-2">
               <span
                 aria-hidden="true"
-                className={`h-2 w-2 rounded-full ${backendOnline === true
+                className={`h-2 w-2 rounded-full ${engineMode === "browser"
+                  ? "bg-violet-400"
+                  : backendOnline === true
                   ? "bg-emerald-400"
                   : backendOnline === false
                     ? "bg-red-400"
@@ -1184,7 +1220,9 @@ export default function Home() {
                   }`}
               />
               <span className="text-xs text-slate-300">
-                {backendOnline === true
+                {engineMode === "browser"
+                  ? "Browser Mode"
+                  : backendOnline === true
                   ? "API Connected"
                   : backendOnline === false
                     ? "API Offline"
@@ -1196,7 +1234,9 @@ export default function Home() {
               Conditional DDPM · EMA
             </p>
             <p className="mt-3 text-xs text-slate-400">
-              FastAPI · PyTorch · DDIM
+              {engineMode === "browser"
+                ? "ONNX Runtime Web · DDIM"
+                : "FastAPI · PyTorch · DDIM"}
             </p>
           </div>
         </aside>
@@ -1240,7 +1280,9 @@ export default function Home() {
             <div className="flex items-center gap-3 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2.5">
               <span
                 aria-hidden="true"
-                className={`h-2 w-2 rounded-full ${backendOnline === true
+                className={`h-2 w-2 rounded-full ${engineMode === "browser"
+                  ? "bg-violet-400"
+                  : backendOnline === true
                   ? "bg-emerald-400"
                   : backendOnline === false
                     ? "bg-red-400"
@@ -1248,7 +1290,9 @@ export default function Home() {
                   }`}
               />
               <span className="text-xs text-slate-300" role="status" aria-live="polite">
-                {backendOnline === true
+                {engineMode === "browser"
+                  ? "Running in your browser"
+                  : backendOnline === true
                   ? `Backend Online · ${backendDevice.toUpperCase()}`
                   : backendOnline === false
                     ? "Backend Offline"
@@ -1257,12 +1301,28 @@ export default function Home() {
             </div>
           </header>
 
+          {engineMode === "browser" && (
+            <div
+              role="note"
+              className="mb-6 flex items-start gap-3 rounded-xl border border-violet-400/20 bg-violet-500/[0.06] px-4 py-3 text-sm text-slate-300"
+            >
+              <span className="mt-0.5 text-violet-300" aria-hidden="true">
+                ◈
+              </span>
+              <p>
+                The laptop server is offline, so the model is running on your
+                device. The first run downloads it (about 25 MB). Fewer images
+                and fewer sampling steps finish faster.
+              </p>
+            </div>
+          )}
+
           {activeTab === "Recognition Timeline" && (
-            <RecognitionTimeline api={API} backendOnline={backendOnline} />
+            <RecognitionTimeline backendOnline={backendOnline} />
           )}
 
           {activeTab === "Sketch to Digit" && (
-            <SketchToDigit api={API} backendOnline={backendOnline} />
+            <SketchToDigit backendOnline={backendOnline} />
           )}
 
           {activeTab === "Denoising Visualizer" && (
