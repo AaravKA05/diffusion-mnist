@@ -24,4 +24,3 @@ typing_extensions==4.16.0
 tzdata==2026.6
 fastapi==0.162.5
 uvicorn==0.54.0
-gradio==6.31.0
