@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { apiFetch } from "@/lib/engine/apiClient";
+
 type SketchItem = {
     image: string;
     pred: number;
@@ -32,10 +34,8 @@ function strengthLabel(strength: number) {
 }
 
 export default function SketchToDigit({
-    api,
     backendOnline,
 }: {
-    api: string;
     backendOnline: boolean | null;
 }) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -116,7 +116,7 @@ export default function SketchToDigit({
         setError("");
 
         try {
-            const response = await fetch(`${api}/api/sketch`, {
+            const response = await apiFetch("/api/sketch", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

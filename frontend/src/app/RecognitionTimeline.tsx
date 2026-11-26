@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { apiFetch, getEngineMode } from "@/lib/engine/apiClient";
+
 type TimelinePoint = {
     step: number;
     timestep: number;
@@ -249,16 +251,15 @@ function TimelineChart({ result }: { result: TimelineResult }) {
 }
 
 export default function RecognitionTimeline({
-    api,
     backendOnline,
 }: {
-    api: string;
     backendOnline: boolean | null;
 }) {
     const [digit, setDigit] = useState(7);
     const [ws, setWs] = useState<number[]>([0, 1.2, 3]);
-    const [steps, setSteps] = useState(30);
-    const [count, setCount] = useState(8);
+    // Lighter defaults when the model runs in the browser
+    const [steps, setSteps] = useState(() => (getEngineMode() === "browser" ? 20 : 30));
+    const [count, setCount] = useState(() => (getEngineMode() === "browser" ? 4 : 8));
     const [seed, setSeed] = useState(42);
     const [result, setResult] = useState<TimelineResult | null>(null);
     const [loading, setLoading] = useState(false);
@@ -280,7 +281,7 @@ export default function RecognitionTimeline({
         setError("");
 
         try {
-            const response = await fetch(`${api}/api/recognition`, {
+            const response = await apiFetch("/api/recognition", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ digit, ws, steps, count, seed }),

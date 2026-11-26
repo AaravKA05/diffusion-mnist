@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ONNX Runtime Web files, copied by scripts/copy-ort.mjs on npm install
+/public/ort
