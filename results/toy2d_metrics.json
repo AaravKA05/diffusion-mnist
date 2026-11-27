@@ -1,0 +1,32 @@
+{
+  "steps": 30000,
+  "T": 100,
+  "gentle": {
+    "beta_end": 0.02,
+    "alpha_bar_T": 0.364,
+    "final_loss_avg_last_500": 0.5111,
+    "train_seconds": 72.3,
+    "sample_to_data": 0.0135,
+    "data_to_sample": 0.0108
+  },
+  "linear": {
+    "beta_end": 0.2,
+    "alpha_bar_T": 2.14e-05,
+    "final_loss_avg_last_500": 0.1848,
+    "train_seconds": 68.1,
+    "sample_to_data": 0.0268,
+    "data_to_sample": 0.013
+  },
+  "aggressive": {
+    "beta_end": 0.5,
+    "alpha_bar_T": 4.5e-14,
+    "final_loss_avg_last_500": 0.1176,
+    "train_seconds": 69.2,
+    "sample_to_data": 0.0428,
+    "data_to_sample": 0.0153
+  },
+  "reference_real_vs_real": {
+    "sample_to_data": 0.0111,
+    "data_to_sample": 0.0109
+  }
+}
