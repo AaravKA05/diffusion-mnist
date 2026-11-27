@@ -15,6 +15,7 @@ import {
   PenLine,
   ScanEye,
   Shuffle,
+  Spline,
   WandSparkles,
   Waves,
   type LucideIcon,
@@ -32,6 +33,7 @@ import { preloadRuntime } from "@/lib/engine/runtime";
 import { claimInlineProgress } from "@/lib/inlineProgress";
 
 import ActivityToast from "./ActivityToast";
+import Diffusion2D from "./Diffusion2D";
 import ImageLightbox from "./ImageLightbox";
 import LaunchScreen from "./LaunchScreen";
 import RecognitionTimeline from "./RecognitionTimeline";
@@ -41,7 +43,8 @@ console.log("ACTIVE BACKEND:", API);
 const DB_NAME = "DiffusionLabDB";
 
 // Sentence case for tab names shown in the UI (the names stay the state keys).
-const tabLabel = (name: string) => name.charAt(0) + name.slice(1).toLowerCase();
+const tabLabel = (name: string) =>
+  (name.charAt(0) + name.slice(1).toLowerCase()).replace(/^2d /, "2D ");
 
 // Sidebar sections. Order inside each group is the order shown.
 const TAB_GROUPS: { label: string; tabs: [LucideIcon, string][] }[] = [
@@ -59,6 +62,7 @@ const TAB_GROUPS: { label: string; tabs: [LucideIcon, string][] }[] = [
       [Blend, "Noise Interpolation"],
       [ChartScatter, "Representation Explorer"],
       [ScanEye, "Recognition Timeline"],
+      [Spline, "2D Playground"],
     ],
   },
   {
@@ -88,6 +92,7 @@ const TAB_TITLES: Record<string, string> = {
   "Representation Explorer": "Representation explorer",
   "Recognition Timeline": "Recognition timeline",
   "Sketch to Digit": "Sketch to digit",
+  "2D Playground": "2D playground",
 };
 
 const TAB_SUBTITLES: Record<string, string> = {
@@ -108,6 +113,8 @@ const TAB_SUBTITLES: Record<string, string> = {
     "Find the sampling step where the digit becomes recognisable, and how guidance changes it.",
   "Sketch to Digit":
     "Draw a rough digit and let the diffusion model clean it up.",
+  "2D Playground":
+    "The same diffusion algorithm on 2,000 points, so every step is visible.",
 };
 const STORE_NAME = "generations";
 
@@ -1408,7 +1415,7 @@ export default function Home() {
             </div>
           </header>
 
-          {engineMode === "browser" && (
+          {engineMode === "browser" && activeTab !== "2D Playground" && (
             <div
               role="note"
               className="mb-6 flex items-start gap-3 rounded-lg border border-slate-700 bg-surface px-4 py-3 text-sm text-slate-300"
@@ -1425,6 +1432,8 @@ export default function Home() {
           {activeTab === "Recognition Timeline" && (
             <RecognitionTimeline backendOnline={backendOnline} />
           )}
+
+          {activeTab === "2D Playground" && <Diffusion2D />}
 
           {activeTab === "Sketch to Digit" && (
             <SketchToDigit backendOnline={backendOnline} />
