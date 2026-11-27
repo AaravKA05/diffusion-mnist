@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { FlaskConical, Gauge, PenLine, ScanEye, Waves, WandSparkles, type LucideIcon } from "lucide-react";
 
+import LiveDenoise from "./LiveDenoise";
+
 const GITHUB_URL = "https://github.com/AaravKA05/diffusion-mnist";
 
 // What the lab contains, in the visitor's words (from the README).
@@ -160,6 +162,9 @@ export default function LaunchScreen({ onEnter }: { onEnter: () => void }) {
                 <div aria-hidden="true" className="h-24 bg-gradient-to-b from-transparent to-canvas" />
                 <div className="bg-canvas">
                     <div className="mx-auto w-full max-w-7xl px-5 sm:px-10">
+                        {/* Live demo: the real model draws a digit */}
+                        <LiveDenoise />
+
                         {/* What's inside */}
                         <section
                             id="lab"

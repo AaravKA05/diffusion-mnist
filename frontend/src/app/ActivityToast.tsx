@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { onActivityChange, type Activity } from "@/lib/engine/apiClient";
+import { onInlineProgressChange } from "@/lib/inlineProgress";
 
 /**
  * Small floating progress bar at the bottom of the screen.
@@ -12,9 +13,13 @@ import { onActivityChange, type Activity } from "@/lib/engine/apiClient";
 export default function ActivityToast() {
   const [activity, setActivity] = useState<Activity | null>(null);
 
-  useEffect(() => onActivityChange(setActivity), []);
+  // Hidden while the page shows the same progress next to the work
+  const [inline, setInline] = useState(false);
 
-  if (!activity) return null;
+  useEffect(() => onActivityChange(setActivity), []);
+  useEffect(() => onInlineProgressChange(setInline), []);
+
+  if (!activity || inline) return null;
 
   const known = activity.total !== null && activity.total > 0;
   const percent = known ? Math.min(100, Math.round((activity.done / (activity.total as number)) * 100)) : 0;

@@ -22,11 +22,14 @@ import {
 import {
   API,
   apiFetch,
+  onActivityChange,
   onEngineModeChange,
   setEngineMode,
+  type Activity as EngineActivity,
   type EngineMode,
 } from "@/lib/engine/apiClient";
 import { preloadRuntime } from "@/lib/engine/runtime";
+import { claimInlineProgress } from "@/lib/inlineProgress";
 
 import ActivityToast from "./ActivityToast";
 import ImageLightbox from "./ImageLightbox";
@@ -412,16 +415,52 @@ function SkeletonGrid({
   );
 }
 
-function LoadingNote({ text }: { text: string }) {
+/**
+ * Loading line under a running job. In browser mode it shows the real
+ * denoising progress ("Step 12 of 20"); on the server, where steps are not
+ * reported, it keeps the spinner.
+ */
+function LoadingNote({ text, className = "mt-5" }: { text: string; className?: string }) {
+  const [activity, setActivity] = useState<EngineActivity | null>(null);
+  useEffect(() => onActivityChange(setActivity), []);
+  useEffect(() => claimInlineProgress(), []);
+
+  const total = activity?.mode === "browser" ? activity.total : null;
+  const done = activity?.done ?? 0;
+  const known = total !== null && total > 0 && done > 0;
+  const percent = known ? Math.round((done / total) * 100) : 0;
+
   return (
-    <p
-      role="status"
-      aria-live="polite"
-      className="mt-5 flex items-center justify-center gap-2 text-sm text-violet-300"
-    >
-      <span className="dl-spinner" aria-hidden="true" />
-      {text}
-    </p>
+    <div className={`${className} flex flex-col items-center gap-2.5`}>
+      <p
+        role="status"
+        aria-live="polite"
+        className="flex items-center justify-center gap-2 text-sm text-slate-200"
+      >
+        {!known && <span className="dl-spinner" aria-hidden="true" />}
+        {text}
+      </p>
+      {known && (
+        <>
+          <div
+            className="h-1 w-56 max-w-full overflow-hidden rounded-full bg-slate-700"
+            role="progressbar"
+            aria-label="Denoising progress"
+            aria-valuemin={0}
+            aria-valuemax={total}
+            aria-valuenow={done}
+          >
+            <div
+              className="h-full rounded-full bg-violet-500 transition-[width] duration-200 ease-out"
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+          <p className="text-sm tabular-nums text-slate-400" aria-hidden="true">
+            Step {Math.min(done, total)} of {total}
+          </p>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -1576,7 +1615,7 @@ export default function Home() {
 
                   {visualizationLoading && (
                     <div className="dl-skeleton mt-6 flex min-h-[380px] flex-col items-center justify-center rounded-xl border border-white/10 bg-black/20 p-8 text-center">
-                      <LoadingNote text="Running the DDIM sampler and capturing intermediate states..." />
+                      <LoadingNote text="Capturing the denoising steps" />
                     </div>
                   )}
 
@@ -1762,7 +1801,7 @@ export default function Home() {
                                     : `Frame ${index + 1}`}
                               </p>
                               <p className="text-xs text-slate-400">
-                                t = {frame.timestep}
+                                {frame.timestep < 0 ? "Clean" : `t = ${frame.timestep}`}
                               </p>
                             </button>
                           ))}
@@ -2530,8 +2569,11 @@ export default function Home() {
 
                   {loading ? (
                     <>
+                      <LoadingNote
+                        className="mb-6"
+                        text={`Denoising ${count} sample${count === 1 ? "" : "s"} of ${digit}`}
+                      />
                       <SkeletonGrid count={count} />
-                      <LoadingNote text={`Denoising ${count} sample${count === 1 ? "" : "s"} with ${steps} DDIM steps...`} />
                     </>
                   ) : images.length === 0 ? (
                     <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-black/20 p-8 text-center">
@@ -2633,7 +2675,7 @@ export default function Home() {
 
                 {compareLoading && (
                   <div className="mt-8 space-y-6">
-                    <LoadingNote text="Running three sampling experiments..." />
+                    <LoadingNote text="Running three sampling experiments" />
                     {[0, 1, 2].map((row) => (
                       <div
                         key={row}
@@ -2856,7 +2898,7 @@ export default function Home() {
                 )}
 
                 {experimentLoading && (
-                  <LoadingNote text="Generating comparison samples..." />
+                  <LoadingNote text="Generating comparison samples" />
                 )}
               </div>
 
