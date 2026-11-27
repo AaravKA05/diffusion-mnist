@@ -1,26 +1,43 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { FlaskConical, Gauge, PenLine, ScanEye, Waves, WandSparkles, type LucideIcon } from "lucide-react";
 
 const GITHUB_URL = "https://github.com/AaravKA05/diffusion-mnist";
 
-function ArrowUpRight({ className = "h-4 w-4" }: { className?: string }) {
-    return (
-        <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={className}
-            aria-hidden="true"
-        >
-            <path d="M7 17 17 7" />
-            <path d="M7 7h10v10" />
-        </svg>
-    );
-}
+// What the lab contains, in the visitor's words (from the README).
+const TOOLS: { icon: LucideIcon; name: string; text: string }[] = [
+    {
+        icon: WandSparkles,
+        name: "Studio",
+        text: "Pick a digit, guidance scale, sampling steps and seed, then generate samples the classifier checks.",
+    },
+    {
+        icon: Waves,
+        name: "Denoising visualizer",
+        text: "Step through the reverse process and see each intermediate image.",
+    },
+    {
+        icon: ScanEye,
+        name: "Recognition timeline",
+        text: "Find the sampling step where the classifier starts reading the digit you asked for.",
+    },
+    {
+        icon: PenLine,
+        name: "Sketch to digit",
+        text: "Draw a digit with a mouse, finger or pen and let the model clean it up.",
+    },
+    {
+        icon: FlaskConical,
+        name: "Experiment lab",
+        text: "Compare guidance values and sampling steps side by side.",
+    },
+    {
+        icon: Gauge,
+        name: "Evaluation",
+        text: "Score generated digits with a classifier and check for copied training images.",
+    },
+];
 
 /**
  * Full-screen start page shown when the site opens.
@@ -58,8 +75,9 @@ export default function LaunchScreen({ onEnter }: { onEnter: () => void }) {
     return (
         <section
             aria-labelledby="launch-heading"
-            className={`fixed inset-0 z-50 flex flex-col overflow-y-auto overscroll-contain bg-canvas text-white transition-[opacity,transform] duration-500 ease-out ${leaving ? "pointer-events-none scale-[1.02] opacity-0" : "opacity-100"
-                }`}
+            className={`fixed inset-0 z-50 flex flex-col overflow-y-auto overscroll-contain bg-canvas text-white transition-[opacity,transform] duration-500 ease-out ${
+                leaving ? "pointer-events-none scale-[1.02] opacity-0" : "opacity-100"
+            }`}
         >
             {/* Background: the model turning noise into digits */}
             <video
@@ -76,76 +94,121 @@ export default function LaunchScreen({ onEnter }: { onEnter: () => void }) {
                 <source src="/media/denoising-bg.mp4" type="video/mp4" />
             </video>
 
-            {/* Navy tint on the noise, fades, and a coral glow so the text stays readable */}
+            {/* Navy tint on the noise, plus fades so the text stays readable */}
             <div className="pointer-events-none fixed inset-0 z-[1] bg-[#1e2f5c] opacity-45 mix-blend-color" />
             <div className="pointer-events-none fixed inset-x-0 top-0 z-[1] h-48 bg-gradient-to-b from-canvas to-transparent" />
-            <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1] h-64 bg-gradient-to-t from-canvas via-canvas/80 to-transparent" />
-            <div className="pointer-events-none fixed inset-0 z-[1] bg-[radial-gradient(ellipse_at_center,rgba(255,90,79,0.18),transparent_65%)]" />
 
-            {/* Top bar */}
-            <header className="relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between px-5 pt-6 sm:px-10">
-                <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-lg font-bold">
-                        D
+            <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-col px-5 sm:px-10">
+                {/* Top bar */}
+                <header className="flex items-center justify-between gap-4 py-6">
+                    <div className="flex items-center gap-2.5">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-violet-500 text-base font-bold text-black">
+                            D
+                        </div>
+                        <span className="text-[17px] font-semibold tracking-[-0.01em]">DiffusionLab</span>
                     </div>
-                    <span className="font-semibold">DiffusionLab</span>
-                </div>
-                <a
-                    href={GITHUB_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-sm text-slate-300 transition hover:text-white"
-                >
-                    GitHub
-                    <ArrowUpRight className="h-3.5 w-3.5" />
-                </a>
-            </header>
+                    <nav aria-label="Site" className="flex items-center gap-1 text-sm text-slate-300">
+                        <a href="#lab" className="hidden min-h-11 items-center px-3 hover:text-white sm:flex">
+                            What&apos;s inside
+                        </a>
+                        <a
+                            href={GITHUB_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex min-h-11 items-center px-3 hover:text-white"
+                        >
+                            GitHub
+                        </a>
+                    </nav>
+                </header>
 
-            {/* Centre */}
-            <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-5 py-16 text-center sm:px-10">
-                <p className="text-xs font-medium uppercase tracking-[0.25em] text-violet-400">
-                    Machine Learning (UML501)
-                </p>
-
-                <h1
-                    id="launch-heading"
-                    className="mx-auto mt-5 max-w-4xl text-4xl leading-[1.05] font-semibold tracking-tight text-white sm:text-6xl lg:text-7xl"
-                >
-                    From pure noise to a{" "}
-                    <span className="bg-gradient-to-r from-violet-300 to-violet-500 bg-clip-text text-transparent">
-                        handwritten digit.
-                    </span>
-                </h1>
-
-                <p className="mx-auto mt-6 max-w-xl text-sm leading-6 text-slate-300 sm:text-base sm:leading-7">
-                    A class-conditional diffusion model built from scratch in PyTorch. It runs on
-                    our laptop server, or right here in your browser when the server is off.
-                </p>
-
-                <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
-                    <button
-                        onClick={enter}
-                        className="liquid-glass flex items-center gap-2 rounded-full px-7 py-3.5 text-sm font-medium text-white hover:bg-white/10 sm:text-base"
+                {/* Hero */}
+                <div className="flex flex-col gap-7 py-20 sm:py-28">
+                    <h1
+                        id="launch-heading"
+                        className="max-w-[14ch] text-5xl leading-[0.98] font-semibold tracking-[-0.035em] text-balance sm:text-7xl lg:text-8xl"
                     >
-                        Open the Studio
-                        <ArrowUpRight className="h-5 w-5" />
-                    </button>
-                    <a
-                        href={GITHUB_URL}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-sm font-medium text-black transition hover:bg-white/90 sm:text-base"
-                    >
-                        View on GitHub
-                        <ArrowUpRight />
-                    </a>
+                        From pure noise to a handwritten digit.
+                    </h1>
+                    <div className="flex flex-wrap items-end justify-between gap-x-12 gap-y-6">
+                        <p className="max-w-[54ch] text-base leading-7 text-slate-200 sm:text-lg">
+                            A class-conditional diffusion model built from scratch in PyTorch. It runs on our
+                            laptop server, or right here in your browser when the server is off.
+                        </p>
+                        <div className="flex flex-wrap gap-3">
+                            <button
+                                onClick={enter}
+                                className="flex min-h-[52px] items-center rounded-lg bg-violet-500 px-6 font-semibold text-black hover:bg-violet-400"
+                            >
+                                Open the Studio
+                            </button>
+                            <a
+                                href={GITHUB_URL}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex min-h-[52px] items-center rounded-lg border border-white/25 px-6 font-medium text-white hover:bg-white/5"
+                            >
+                                Read the code
+                            </a>
+                        </div>
+                    </div>
                 </div>
-
-                <p className="mt-7 text-xs text-slate-400">
-                    PyTorch · FastAPI · Next.js · ONNX Runtime Web
-                </p>
             </div>
 
+            {/* Solid ground below the hero, so the list reads cleanly over the video */}
+            <div className="relative z-10 mt-auto">
+                <div aria-hidden="true" className="h-24 bg-gradient-to-b from-transparent to-canvas" />
+                <div className="bg-canvas">
+                    <div className="mx-auto w-full max-w-7xl px-5 sm:px-10">
+                        {/* What's inside */}
+                        <section
+                            id="lab"
+                            aria-labelledby="lab-heading"
+                            className="flex flex-wrap gap-x-16 gap-y-8 border-t border-slate-700 py-12"
+                        >
+                            <div className="max-w-sm flex-[1_1_260px]">
+                                <h2 id="lab-heading" className="text-3xl font-semibold tracking-[-0.02em]">
+                                    What&apos;s inside the lab
+                                </h2>
+                                <p className="mt-3 text-slate-300">
+                                    Tools for generating digits and seeing how the model decides what it is
+                                    drawing.
+                                </p>
+                            </div>
+                            <dl className="grid flex-[999_1_520px] grid-cols-1 gap-x-10 md:grid-cols-2">
+                                {TOOLS.map(({ icon: Icon, name, text }) => (
+                                    <div key={name} className="flex gap-3.5 border-t border-slate-700 py-5">
+                                        <Icon
+                                            className="mt-0.5 h-5 w-5 shrink-0 text-violet-400"
+                                            strokeWidth={1.75}
+                                            aria-hidden="true"
+                                        />
+                                        <div>
+                                            <dt className="font-semibold">{name}</dt>
+                                            <dd className="mt-1 text-[15px] text-slate-300">{text}</dd>
+                                        </div>
+                                    </div>
+                                ))}
+                            </dl>
+                        </section>
+
+                        <footer className="flex flex-wrap justify-between gap-x-8 gap-y-3 border-t border-slate-700 py-7 text-sm text-slate-400">
+                            <p className="max-w-[70ch]">
+                                A UML501 machine learning course project. Built with PyTorch, FastAPI, Next.js
+                                and ONNX Runtime Web.
+                            </p>
+                            <a
+                                href={GITHUB_URL}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-slate-300 hover:text-white"
+                            >
+                                AaravKA05/diffusion-mnist
+                            </a>
+                        </footer>
+                    </div>
+                </div>
+            </div>
         </section>
     );
 }

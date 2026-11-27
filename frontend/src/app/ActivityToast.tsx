@@ -51,11 +51,11 @@ export default function ActivityToast() {
         >
           {known ? (
             <div
-              className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-[width] duration-200 ease-out"
+              className="h-full rounded-full bg-violet-500 transition-[width] duration-200 ease-out"
               style={{ width: `${percent}%` }}
             />
           ) : (
-            <div className="dl-indeterminate h-full w-1/3 rounded-full bg-gradient-to-r from-indigo-500 to-violet-500" />
+            <div className="dl-indeterminate h-full w-1/3 rounded-full bg-violet-500" />
           )}
         </div>
       </div>
