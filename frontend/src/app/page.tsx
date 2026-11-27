@@ -3,6 +3,23 @@
 import { useEffect, useState } from "react";
 
 import {
+  Activity,
+  Blend,
+  ChartScatter,
+  ChevronDown,
+  Download,
+  FlaskConical,
+  Gauge,
+  Info,
+  LayoutGrid,
+  PenLine,
+  ScanEye,
+  Shuffle,
+  WandSparkles,
+  Waves,
+  type LucideIcon,
+} from "lucide-react";
+import {
   API,
   apiFetch,
   onEngineModeChange,
@@ -20,55 +37,58 @@ import SketchToDigit from "./SketchToDigit";
 console.log("ACTIVE BACKEND:", API);
 const DB_NAME = "DiffusionLabDB";
 
+// Sentence case for tab names shown in the UI (the names stay the state keys).
+const tabLabel = (name: string) => name.charAt(0) + name.slice(1).toLowerCase();
+
 // Sidebar sections. Order inside each group is the order shown.
-const TAB_GROUPS: { label: string; tabs: [string, string][] }[] = [
+const TAB_GROUPS: { label: string; tabs: [LucideIcon, string][] }[] = [
   {
     label: "Create",
     tabs: [
-      ["◈", "Studio"],
-      ["✎", "Sketch to Digit"],
+      [WandSparkles, "Studio"],
+      [PenLine, "Sketch to Digit"],
     ],
   },
   {
     label: "Explore",
     tabs: [
-      ["◌", "Denoising Visualizer"],
-      ["◈", "Noise Interpolation"],
-      ["◉", "Representation Explorer"],
-      ["⟿", "Recognition Timeline"],
+      [Waves, "Denoising Visualizer"],
+      [Blend, "Noise Interpolation"],
+      [ChartScatter, "Representation Explorer"],
+      [ScanEye, "Recognition Timeline"],
     ],
   },
   {
     label: "Evaluate",
     tabs: [
-      ["◎", "Evaluation"],
-      ["⚗", "Experiment Lab"],
+      [Gauge, "Evaluation"],
+      [FlaskConical, "Experiment Lab"],
     ],
   },
   {
     label: "History",
     tabs: [
-      ["▦", "My Generations"],
-      ["◉", "Model Insights"],
+      [LayoutGrid, "My Generations"],
+      [Activity, "Model Insights"],
     ],
   },
 ];
 
 const TAB_TITLES: Record<string, string> = {
-  Studio: "Creative Studio",
-  "My Generations": "My Generations",
-  "Model Insights": "Model Insights",
-  Evaluation: "Model Evaluation",
-  "Denoising Visualizer": "Denoising Visualizer",
-  "Noise Interpolation": "Noise Interpolation",
-  "Experiment Lab": "Experiment Lab",
-  "Representation Explorer": "Representation Explorer",
-  "Recognition Timeline": "Recognition Timeline",
-  "Sketch to Digit": "Sketch to Digit",
+  Studio: "Studio",
+  "My Generations": "My generations",
+  "Model Insights": "Model insights",
+  Evaluation: "Model evaluation",
+  "Denoising Visualizer": "Denoising visualizer",
+  "Noise Interpolation": "Noise interpolation",
+  "Experiment Lab": "Experiment lab",
+  "Representation Explorer": "Representation explorer",
+  "Recognition Timeline": "Recognition timeline",
+  "Sketch to Digit": "Sketch to digit",
 };
 
 const TAB_SUBTITLES: Record<string, string> = {
-  Studio: "Explore handwritten digit generation with diffusion models.",
+  Studio: "Generate handwritten digits with the conditional DDPM, sampled with DDIM.",
   "My Generations": "Your previously generated samples, saved in this browser.",
   "Model Insights": "A summary of your generation activity and model configuration.",
   Evaluation:
@@ -342,7 +362,7 @@ function ImageCard({
 
   return (
     <div
-      className={`dl-fade-in overflow-hidden rounded-xl border-2 bg-black/40 p-2 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-violet-950/40 ${correct ? "border-emerald-500/70" : "border-red-500/70"
+      className={`dl-fade-in overflow-hidden rounded-lg border bg-black p-1.5 ${correct ? "border-transparent" : "border-violet-300"
         }`}
     >
       <img
@@ -351,16 +371,18 @@ function ImageCard({
         className="aspect-square w-full rounded-lg object-contain"
       />
 
-      <p className="mt-2 text-center text-xs text-slate-400">
-        Read as {item.pred} · {(item.conf * 100).toFixed(1)}%
+      <p className={`mt-2 text-center text-xs tabular-nums ${correct ? "text-slate-300" : "font-semibold text-violet-200"}`}>
+        Read as {item.pred}, {(item.conf * 100).toFixed(1)}%
       </p>
 
       {onDownload && (
         <button
           onClick={onDownload}
-          className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 py-2 text-xs text-slate-300 hover:bg-white/10"
+          aria-label={`Download sample ${index + 1}`}
+          className="mt-1.5 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-md text-xs text-slate-300 hover:bg-white/5"
         >
-          ↓ Download
+          <Download className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+          Download
         </button>
       )}
     </div>
@@ -413,11 +435,11 @@ function StatCard({
   description: string;
 }) {
   return (
-    <div className="rounded-xl border border-white/[0.08] bg-white/[0.035] p-5">
-      <p className="text-xs font-semibold tracking-[0.2em] text-slate-400">
+    <div className="border-t border-slate-700 pt-4">
+      <p className="text-sm text-slate-400">
         {label}
       </p>
-      <h3 className="mt-3 text-2xl font-semibold">{value}</h3>
+      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
       <p className="mt-1 text-xs text-slate-400">{description}</p>
     </div>
   );
@@ -1188,55 +1210,49 @@ export default function Home() {
 
 
   return (
-    <main className="min-h-screen bg-canvas text-white selection:bg-violet-500/30">
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -left-40 top-20 h-96 w-96 rounded-full bg-[#2f4fa8]/15 blur-[130px]" />
-        <div className="absolute right-0 top-40 h-96 w-96 rounded-full bg-violet-600/[0.06] blur-[130px]" />
-        <div className="absolute bottom-0 left-1/2 h-80 w-80 rounded-full bg-violet-500/5 blur-[130px]" />
-      </div>
+    <main className="min-h-screen bg-canvas text-white selection:bg-violet-500 selection:text-black">
 
       <div className="relative mx-auto flex min-h-screen max-w-[1600px]" inert={showLaunch}>
-        <aside className="hidden w-64 shrink-0 border-r border-white/[0.07] bg-white/[0.015] p-6 lg:flex lg:flex-col">
+        <aside className="hidden w-64 shrink-0 border-r border-slate-700 bg-slate-900 p-5 lg:flex lg:flex-col">
           <div className="mb-12 flex items-center gap-3">
             <button
               type="button"
               onClick={() => setShowLaunch(true)}
               aria-label="Back to the start screen"
               title="Back to the start screen"
-              className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-xl font-bold hover:brightness-110"
+              className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-500 text-xl font-bold text-black hover:bg-violet-400"
             >
               D
             </button>
             <div>
               <h1 className="text-lg font-semibold">DiffusionLab</h1>
-              <p className="whitespace-nowrap text-xs uppercase tracking-[0.12em] text-slate-400">
-                Generative Studio
-              </p>
             </div>
           </div>
 
           <nav className="space-y-6" aria-label="Workspace sections">
             {TAB_GROUPS.map((group) => (
               <div key={group.label}>
-                <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                <p className="mb-1 px-3 text-xs font-medium text-slate-400">
                   {group.label}
                 </p>
                 <div className="space-y-1" role="tablist" aria-label={group.label}>
-                  {group.tabs.map(([icon, name]) => (
+                  {group.tabs.map(([Icon, name]) => (
                     <button
                       key={name}
                       role="tab"
                       aria-selected={activeTab === name}
                       onClick={() => setActiveTab(name)}
-                      className={`flex w-full items-center gap-3 rounded-xl border px-4 py-2.5 text-left text-sm transition ${activeTab === name
-                        ? "border-violet-400/25 bg-violet-500/10 text-white shadow-[inset_3px_0_0_0_rgb(255_90_74)]"
+                      className={`flex min-h-11 w-full items-center gap-3 rounded-lg border px-3 text-left text-sm transition ${activeTab === name
+                        ? "border-transparent bg-surface-2 text-white"
                         : "border-transparent text-slate-400 hover:bg-white/5 hover:text-white"
                         }`}
                     >
-                      <span className="w-5 shrink-0 text-center text-lg" aria-hidden="true">
-                        {icon}
-                      </span>
-                      {name}
+                      <Icon
+                        className={`h-[18px] w-[18px] shrink-0 ${activeTab === name ? "text-violet-400" : ""}`}
+                        strokeWidth={1.75}
+                        aria-hidden="true"
+                      />
+                      {tabLabel(name)}
                     </button>
                   ))}
                 </div>
@@ -1244,12 +1260,12 @@ export default function Home() {
             ))}
           </nav>
 
-          <div className="mt-auto rounded-xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="mt-auto border-t border-slate-700 pt-4">
             <div className="mb-3 flex items-center gap-2">
               <span
                 aria-hidden="true"
                 className={`h-2 w-2 rounded-full ${engineMode === "browser"
-                  ? "bg-violet-400"
+                  ? "bg-sky-400"
                   : backendOnline === true
                     ? "bg-emerald-400"
                     : backendOnline === false
@@ -1259,22 +1275,22 @@ export default function Home() {
               />
               <span className="text-xs text-slate-300">
                 {engineMode === "browser"
-                  ? "Browser Mode"
+                  ? "Running in your browser"
                   : backendOnline === true
-                    ? "API Connected"
+                    ? "Backend online"
                     : backendOnline === false
-                      ? "API Offline"
-                      : "Checking API..."}
+                      ? "Backend offline"
+                      : "Checking backend…"}
               </span>
             </div>
             <p className="text-sm font-medium">MNIST Model</p>
             <p className="mt-1 text-xs text-slate-400">
-              Conditional DDPM · EMA
+              Conditional DDPM with EMA weights
             </p>
             <p className="mt-3 text-xs text-slate-400">
               {engineMode === "browser"
-                ? "ONNX Runtime Web · DDIM"
-                : "FastAPI · PyTorch · DDIM"}
+                ? "ONNX Runtime Web, DDIM sampling"
+                : "FastAPI and PyTorch, DDIM sampling"}
             </p>
           </div>
         </aside>
@@ -1286,7 +1302,7 @@ export default function Home() {
               type="button"
               onClick={() => setShowLaunch(true)}
               aria-label="Back to the start screen"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-xl font-bold hover:brightness-110"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-500 text-xl font-bold text-black hover:bg-violet-400"
             >
               D
             </button>
@@ -1302,9 +1318,9 @@ export default function Home() {
               >
                 {TAB_GROUPS.map((group) => (
                   <optgroup key={group.label} label={group.label}>
-                    {group.tabs.map(([icon, name]) => (
+                    {group.tabs.map(([, name]) => (
                       <option key={name} value={name}>
-                        {icon} {name}
+                        {tabLabel(name)}
                       </option>
                     ))}
                   </optgroup>
@@ -1314,30 +1330,26 @@ export default function Home() {
                 className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
                 aria-hidden="true"
               >
-                ▾
+                <ChevronDown className="h-4 w-4" strokeWidth={1.75} />
               </span>
             </div>
           </div>
 
           <header className="mb-10 flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="mb-2 text-xs tracking-widest text-violet-300">
-                YOUR GENERATIVE WORKSPACE
-              </p>
               <h2 className="text-3xl font-semibold sm:text-4xl">
                 {TAB_TITLES[activeTab] ?? activeTab}
-                <span className="text-violet-400">.</span>
               </h2>
               <p className="mt-2 text-sm text-slate-400">
                 {TAB_SUBTITLES[activeTab] ?? ""}
               </p>
             </div>
 
-            <div className="flex items-center gap-3 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2.5">
+            <div className="flex items-center gap-2.5">
               <span
                 aria-hidden="true"
                 className={`h-2 w-2 rounded-full ${engineMode === "browser"
-                  ? "bg-violet-400"
+                  ? "bg-sky-400"
                   : backendOnline === true
                     ? "bg-emerald-400"
                     : backendOnline === false
@@ -1345,14 +1357,14 @@ export default function Home() {
                       : "bg-amber-400"
                   }`}
               />
-              <span className="text-xs text-slate-300" role="status" aria-live="polite">
+              <span className="text-sm text-slate-300" role="status" aria-live="polite">
                 {engineMode === "browser"
                   ? "Running in your browser"
                   : backendOnline === true
-                    ? `Backend Online · ${backendDevice.toUpperCase()}`
+                    ? `Backend online, running on ${backendDevice.toUpperCase()}`
                     : backendOnline === false
-                      ? "Backend Offline"
-                      : "Checking Backend..."}
+                      ? "Backend offline"
+                      : "Checking backend…"}
               </span>
             </div>
           </header>
@@ -1360,11 +1372,9 @@ export default function Home() {
           {engineMode === "browser" && (
             <div
               role="note"
-              className="mb-6 flex items-start gap-3 rounded-xl border border-violet-400/20 bg-violet-500/[0.06] px-4 py-3 text-sm text-slate-300"
+              className="mb-6 flex items-start gap-3 rounded-lg border border-slate-700 bg-surface px-4 py-3 text-sm text-slate-300"
             >
-              <span className="mt-0.5 text-violet-300" aria-hidden="true">
-                ◈
-              </span>
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-violet-400" strokeWidth={1.75} aria-hidden="true" />
               <p>
                 The laptop server is offline, so the model is running on your
                 device. The first run downloads it (about 25 MB). Fewer images
@@ -1384,11 +1394,8 @@ export default function Home() {
           {activeTab === "Denoising Visualizer" && (
             <section className="space-y-6">
               <div className="rounded-2xl border border-violet-400/20 bg-violet-500/[0.06] p-6 sm:p-8">
-                <p className="text-xs tracking-widest text-violet-300">
-                  DIFFUSION PROCESS / STEP BY STEP
-                </p>
                 <h3 className="mt-2 text-2xl font-semibold">
-                  From Noise to a Handwritten Digit
+                  From noise to a handwritten digit
                 </h3>
                 <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
                   This visualizer captures intermediate states from the actual
@@ -1400,16 +1407,13 @@ export default function Home() {
 
               <div className="grid grid-cols-1 gap-6 xl:grid-cols-[0.8fr_1.2fr]">
                 <div className="rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
-                  <p className="text-xs tracking-widest text-violet-300">
-                    01 / CONFIGURATION
-                  </p>
                   <h3 className="mt-2 text-xl font-semibold">
-                    Visualizer Settings
+                    Visualizer settings
                   </h3>
 
                   <div className="mt-7">
                     <div className="mb-3 flex justify-between text-sm">
-                      <label>Target digit</label>
+                      <p>Target digit</p>
                       <span className="text-violet-300">{visualDigit}</span>
                     </div>
                     <div className="grid grid-cols-5 gap-2">
@@ -1433,12 +1437,12 @@ export default function Home() {
                   <div className="mt-7 space-y-6">
                     <div>
                       <div className="mb-2 flex justify-between text-sm">
-                        <label>Guidance scale</label>
+                        <label htmlFor="page-guidance-scale">Guidance scale</label>
                         <span className="text-violet-300">
                           {visualGuidance.toFixed(1)}
                         </span>
                       </div>
-                      <input
+                      <input id="page-guidance-scale"
                         type="range"
                         min="0"
                         max="3"
@@ -1453,10 +1457,10 @@ export default function Home() {
 
                     <div>
                       <div className="mb-2 flex justify-between text-sm">
-                        <label>DDIM sampling steps</label>
+                        <label htmlFor="page-ddim-sampling-steps">DDIM sampling steps</label>
                         <span className="text-violet-300">{visualSteps}</span>
                       </div>
-                      <input
+                      <input id="page-ddim-sampling-steps"
                         type="range"
                         min="5"
                         max="100"
@@ -1471,10 +1475,10 @@ export default function Home() {
 
                     <div>
                       <div className="mb-2 flex justify-between text-sm">
-                        <label>Snapshot count</label>
+                        <label htmlFor="page-snapshot-count">Snapshot count</label>
                         <span className="text-violet-300">{snapshotCount}</span>
                       </div>
-                      <input
+                      <input id="page-snapshot-count"
                         type="range"
                         min="4"
                         max="12"
@@ -1491,9 +1495,9 @@ export default function Home() {
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-sm">Random seed</label>
+                      <label htmlFor="page-random-seed" className="mb-2 block text-sm">Random seed</label>
                       <div className="flex gap-2">
-                        <input
+                        <input id="page-random-seed"
                           type="number"
                           min="0"
                           max="2147483647"
@@ -1526,13 +1530,13 @@ export default function Home() {
                   <button
                     onClick={runVisualization}
                     disabled={visualizationLoading || backendOnline !== true}
-                    className="mt-8 w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-4 font-semibold shadow-lg shadow-violet-900/30 transition enabled:hover:brightness-110 enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="mt-8 w-full rounded-xl bg-violet-500 text-black py-4 font-semibold transition enabled:hover:bg-violet-400 enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {visualizationLoading
                       ? "Generating sampling frames..."
                       : backendOnline === true
                         ? "Run Denoising Visualization"
-                        : "Backend Unavailable"}
+                        : "Backend offline"}
                   </button>
 
                   {visualizationError && (
@@ -1545,15 +1549,12 @@ export default function Home() {
                 <div className="rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <p className="text-xs tracking-widest text-violet-300">
-                        02 / SAMPLING TIMELINE
-                      </p>
                       <h3 className="mt-2 text-xl font-semibold">
-                        Denoising Frames
+                        Denoising frames
                       </h3>
                     </div>
                     {visualization && (
-                      <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-300">
+                      <span className="text-sm text-slate-300">
                         {visualization.snapshots.length} frames captured
                       </span>
                     )}
@@ -1561,9 +1562,7 @@ export default function Home() {
 
                   {!visualization && !visualizationLoading && (
                     <div className="mt-6 flex min-h-[380px] flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-black/20 p-8 text-center">
-                      <div className="flex h-28 w-28 items-center justify-center rounded-2xl border border-violet-400/20 bg-violet-500/10 text-6xl text-violet-300">
-                        {visualDigit}
-                      </div>
+                      <Waves className="h-8 w-8 text-slate-400" strokeWidth={1.5} aria-hidden="true" />
                       <h4 className="mt-6 text-lg font-medium">
                         Ready to visualize
                       </h4>
@@ -1670,8 +1669,8 @@ export default function Home() {
                             </button>
 
                             <div className="flex items-center gap-2">
-                              <label className="text-xs text-slate-400">Speed</label>
-                              <select
+                              <label htmlFor="page-speed" className="text-xs text-slate-400">Speed</label>
+                              <select id="page-speed"
                                 value={visualPlaybackSpeed}
                                 onChange={(e) => setVisualPlaybackSpeed(Number(e.target.value))}
                                 className="rounded-lg border border-white/10 bg-surface px-3 py-2 text-sm"
@@ -1708,7 +1707,7 @@ export default function Home() {
 
                         <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
                           <div
-                            className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500"
+                            className="h-full rounded-full bg-violet-500"
                             style={{
                               width: `${((activeFrame + 1) /
                                 visualization.snapshots.length) *
@@ -1721,26 +1720,24 @@ export default function Home() {
 
                       <div className="mt-5 grid grid-cols-3 gap-3">
                         <StatCard
-                          label="DIGIT"
+                          label="Digit"
                           value={String(visualization.digit)}
                           description="Condition label"
                         />
                         <StatCard
-                          label="DDIM STEPS"
+                          label="DDIM steps"
                           value={String(visualization.steps)}
                           description="Sampling steps"
                         />
                         <StatCard
-                          label="TIME"
+                          label="Time"
                           value={`${visualization.seconds.toFixed(2)} s`}
                           description="Backend runtime"
                         />
                       </div>
 
                       <div className="mt-5">
-                        <p className="mb-3 text-xs font-semibold tracking-widest text-slate-400">
-                          ALL CAPTURED FRAMES · SELECT TO INSPECT
-                        </p>
+                        <p className="mb-3 text-sm text-slate-400">Captured frames. Select one to inspect.</p>
                         <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
                           {visualization.snapshots.map((frame, index) => (
                             <button
@@ -1764,7 +1761,7 @@ export default function Home() {
                                     ? "Final image"
                                     : `Frame ${index + 1}`}
                               </p>
-                              <p className="text-xs text-slate-500">
+                              <p className="text-xs text-slate-400">
                                 t = {frame.timestep}
                               </p>
                             </button>
@@ -1781,11 +1778,8 @@ export default function Home() {
           {activeTab === "Representation Explorer" && (
             <section className="space-y-6">
               <div className="rounded-2xl border border-violet-400/20 bg-violet-500/[0.06] p-6 sm:p-8">
-                <p className="text-xs tracking-widest text-violet-300">
-                  MODEL INTERNALS / FEATURE ANALYSIS
-                </p>
                 <h2 className="mt-3 text-2xl font-semibold">
-                  Latent & Representation Explorer
+                  Latent & representation explorer
                 </h2>
                 <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
                   Explore internal UNet bottleneck activations during
@@ -1797,7 +1791,7 @@ export default function Home() {
               {/* Representation Controls */}
               <div className="mt-6 rounded-2xl border border-white/10 bg-surface/80 p-6 space-y-6">
                 <div>
-                  <h3 className="text-lg font-semibold">Analysis Configuration</h3>
+                  <h3 className="text-lg font-semibold">Analysis configuration</h3>
                   <p className="mt-1 text-sm text-slate-400">
                     Configure the input digit and diffusion sampling parameters.
                   </p>
@@ -1805,8 +1799,8 @@ export default function Home() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
-                    <label className="text-sm text-slate-400">Select Digit</label>
-                    <select
+                    <label htmlFor="page-select-digit" className="text-sm text-slate-400">Select Digit</label>
+                    <select id="page-select-digit"
                       value={representationDigit}
                       onChange={(e) => setRepresentationDigit(Number(e.target.value))}
                       className="mt-2 w-full rounded-xl bg-surface-2 border border-white/10 p-3"
@@ -1818,8 +1812,8 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label className="text-sm text-slate-400">Timestep: {representationTimestep}</label>
-                    <input
+                    <label htmlFor="page-timestep" className="text-sm text-slate-400">Timestep: {representationTimestep}</label>
+                    <input id="page-timestep"
                       type="range"
                       min="0"
                       max="399"
@@ -1830,8 +1824,8 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label className="text-sm text-slate-400">DDIM Steps: {representationSteps}</label>
-                    <input
+                    <label htmlFor="page-ddim-steps" className="text-sm text-slate-400">DDIM Steps: {representationSteps}</label>
+                    <input id="page-ddim-steps"
                       type="range"
                       min="5"
                       max="100"
@@ -1842,10 +1836,10 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label className="text-sm text-slate-400">
+                    <label htmlFor="page-guidance-scale-2" className="text-sm text-slate-400">
                       Guidance Scale: {representationGuidance.toFixed(1)}
                     </label>
-                    <input
+                    <input id="page-guidance-scale-2"
                       type="range"
                       min="0"
                       max="3"
@@ -1858,8 +1852,8 @@ export default function Home() {
                 </div>
 
                 <div>
-                  <label className="text-sm text-slate-400">Random Seed</label>
-                  <input
+                  <label htmlFor="page-random-seed-2" className="text-sm text-slate-400">Random Seed</label>
+                  <input id="page-random-seed-2"
                     type="number"
                     value={representationSeed}
                     onChange={(e) => setRepresentationSeed(Number(e.target.value))}
@@ -1897,7 +1891,7 @@ export default function Home() {
                           key={String(label)}
                           className="rounded-xl border border-white/10 bg-surface p-5"
                         >
-                          <p className="text-xs uppercase tracking-widest text-slate-400">
+                          <p className="text-sm text-slate-400">
                             {label}
                           </p>
                           <p className="mt-2 text-xl font-semibold tabular-nums">
@@ -1910,11 +1904,11 @@ export default function Home() {
                     {/* Feature Information */}
                     <div className="rounded-xl border border-white/10 bg-surface p-5">
                       <h3 className="text-lg font-semibold">
-                        Bottleneck Feature Analysis
+                        Bottleneck feature analysis
                       </h3>
                       <p className="mt-2 text-sm text-slate-400">
-                        Digit {representation.digit} · Requested timestep{" "}
-                        {representation.requested_timestep} · Actual timestep{" "}
+                        Digit {representation.digit}, requested timestep{" "}
+                        {representation.requested_timestep}, actual timestep{" "}
                         {representation.actual_timestep}
                       </p>
                       <p className="mt-1 text-xs text-slate-400">
@@ -1927,7 +1921,7 @@ export default function Home() {
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <h3 className="text-lg font-semibold">
-                            Activation Heatmaps
+                            Activation heatmaps
                           </h3>
                           <p className="text-sm text-slate-400 mt-1">
                             Select a channel to inspect its spatial activation pattern.
@@ -1945,7 +1939,7 @@ export default function Home() {
                             Activation Intensity
                           </p>
                           <p className="text-xs text-slate-400">
-                            Normalized · 0 to 1
+                            Normalised per channel, 0 to 1
                           </p>
                         </div>
 
@@ -1953,7 +1947,7 @@ export default function Home() {
                           className="h-4 w-full rounded-full"
                           style={{
                             background:
-                              "linear-gradient(to right, #0000ff, #00ffff, #ffff00, #ff0000)",
+                              "linear-gradient(to right, #000000, #ffffff)",
                           }}
                         />
 
@@ -2011,11 +2005,8 @@ export default function Home() {
                   {/* Timestep Feature Evolution */}
                   <div className="rounded-2xl border border-violet-400/20 bg-surface/80 p-6 space-y-6">
                     <div>
-                      <p className="text-xs tracking-widest text-violet-300">
-                        TEMPORAL FEATURE ANALYSIS
-                      </p>
                       <h3 className="mt-2 text-xl font-semibold">
-                        Timestep-wise Feature Evolution
+                        Timestep-wise feature evolution
                       </h3>
                       <p className="mt-2 text-sm text-slate-400">
                         Compare how the selected UNet bottleneck channel changes
@@ -2053,7 +2044,7 @@ export default function Home() {
                               key={item.timestep}
                               onClick={() => setSelectedEvolutionIndex(index)}
                               className={`rounded-lg border px-4 py-2 text-sm ${selectedEvolutionIndex === index
-                                ? "border-violet-400 bg-violet-500/15 text-violet-300"
+                                ? "border-violet-500 bg-violet-500 text-black"
                                 : "border-white/10 bg-surface-2 text-slate-400"
                                 }`}
                             >
@@ -2090,11 +2081,10 @@ export default function Home() {
 
                         <div className="rounded-xl border border-white/10 bg-surface-2 p-4">
                           <p className="text-sm text-slate-300">
-                            Digit {evolutionData.digit} · Channel {evolutionData.channel}
+                            Digit {evolutionData.digit}, channel {evolutionData.channel}
                           </p>
                           <p className="mt-2 text-xs text-slate-400">
-                            Seed: {evolutionData.seed} · Guidance: {evolutionData.guidance}
-                            · DDIM steps: {evolutionData.steps}
+                            Seed {evolutionData.seed}, guidance {evolutionData.guidance}, DDIM steps {evolutionData.steps}
                           </p>
                         </div>
                       </div>
@@ -2108,11 +2098,8 @@ export default function Home() {
           {activeTab === "Noise Interpolation" && (
             <section className="space-y-6">
               <div className="rounded-2xl border border-violet-400/20 bg-violet-500/[0.06] p-6 sm:p-8">
-                <p className="text-xs font-semibold tracking-[0.2em] text-violet-300">
-                  LATENT SPACE EXPLORATION
-                </p>
                 <h3 className="mt-3 text-2xl font-semibold">
-                  Noise Interpolation
+                  Noise interpolation
                 </h3>
                 <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
                   Explore how the diffusion model transforms different
@@ -2123,12 +2110,12 @@ export default function Home() {
 
               <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
                 <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-                  <h3 className="text-lg font-semibold">Interpolation Settings</h3>
+                  <h3 className="text-lg font-semibold">Interpolation settings</h3>
 
                   <div className="mt-6 space-y-5">
                     <div>
-                      <label className="text-sm text-slate-400">Target Digit</label>
-                      <select
+                      <label htmlFor="page-target-digit" className="text-sm text-slate-400">Target Digit</label>
+                      <select id="page-target-digit"
                         value={interpDigit}
                         onChange={(e) => setInterpDigit(Number(e.target.value))}
                         className="mt-2 w-full rounded-xl border border-white/10 bg-surface-2 p-3 text-white"
@@ -2140,10 +2127,10 @@ export default function Home() {
                     </div>
 
                     <div>
-                      <label className="text-sm text-slate-400">
+                      <label htmlFor="page-cfg-guidance" className="text-sm text-slate-400">
                         CFG Guidance: {interpGuidance.toFixed(1)}
                       </label>
-                      <input
+                      <input id="page-cfg-guidance"
                         type="range"
                         min="0"
                         max="3"
@@ -2155,10 +2142,10 @@ export default function Home() {
                     </div>
 
                     <div>
-                      <label className="text-sm text-slate-400">
+                      <label htmlFor="page-sampling-steps" className="text-sm text-slate-400">
                         Sampling Steps: {interpSteps}
                       </label>
-                      <input
+                      <input id="page-sampling-steps"
                         type="range"
                         min="5"
                         max="100"
@@ -2171,8 +2158,8 @@ export default function Home() {
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-xs text-slate-400">Seed A</label>
-                        <input
+                        <label htmlFor="page-seed-a" className="text-xs text-slate-400">Seed A</label>
+                        <input id="page-seed-a"
                           type="number"
                           min="0"
                           max="2147483647"
@@ -2182,8 +2169,8 @@ export default function Home() {
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-slate-400">Seed B</label>
-                        <input
+                        <label htmlFor="page-seed-b" className="text-xs text-slate-400">Seed B</label>
+                        <input id="page-seed-b"
                           type="number"
                           min="0"
                           max="2147483647"
@@ -2195,10 +2182,10 @@ export default function Home() {
                     </div>
 
                     <div>
-                      <label className="text-sm text-slate-400">
+                      <label htmlFor="page-number-of-frames" className="text-sm text-slate-400">
                         Number of Frames: {interpFrameCount}
                       </label>
-                      <input
+                      <input id="page-number-of-frames"
                         type="range"
                         min="3"
                         max="15"
@@ -2228,7 +2215,7 @@ export default function Home() {
                 <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
                   {!interpolation ? (
                     <div className="flex min-h-[400px] flex-col items-center justify-center text-center">
-                      <div className="text-5xl text-violet-400">◈</div>
+                      <Blend className="h-8 w-8 text-slate-400" strokeWidth={1.5} aria-hidden="true" />
                       <h3 className="mt-5 text-xl font-semibold">
                         Ready to interpolate
                       </h3>
@@ -2242,20 +2229,20 @@ export default function Home() {
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <h3 className="text-xl font-semibold">
-                            Interpolation Results
+                            Interpolation results
                           </h3>
                           <p className="mt-1 text-xs text-slate-400">
                             Target digit: {interpolation.digit}
                           </p>
                         </div>
-                        <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5 text-xs text-emerald-300">
+                        <span className="text-sm text-slate-300">
                           {interpolation.count} frames generated
                         </span>
                       </div>
 
                       <div className="mt-7 grid grid-cols-1 gap-5 sm:grid-cols-2">
                         <div className="rounded-xl border border-white/10 bg-canvas p-4">
-                          <p className="mb-3 text-xs text-slate-400">Starting Noise · Seed {seedA}</p>
+                          <p className="mb-3 text-xs text-slate-400">Starting noise, seed {seedA}</p>
                           <img
                             src={`data:image/png;base64,${interpolation.frames[0].image}`}
                             alt="Starting interpolation frame"
@@ -2264,7 +2251,7 @@ export default function Home() {
                         </div>
 
                         <div className="rounded-xl border border-white/10 bg-canvas p-4">
-                          <p className="mb-3 text-xs text-slate-400">Ending Noise · Seed {seedB}</p>
+                          <p className="mb-3 text-xs text-slate-400">Ending noise, seed {seedB}</p>
                           <img
                             src={`data:image/png;base64,${interpolation.frames[interpolation.frames.length - 1].image}`}
                             alt="Ending interpolation frame"
@@ -2275,7 +2262,7 @@ export default function Home() {
 
                       <div className="mt-8 rounded-xl border border-violet-400/20 bg-violet-500/[0.05] p-5">
                         <div className="flex flex-wrap items-center justify-between gap-3">
-                          <h4 className="font-semibold">Explore Transition</h4>
+                          <h4 className="font-semibold">Explore transition</h4>
                           <span className="text-sm text-violet-300">
                             α = {interpolation.frames[selectedInterpFrame]?.alpha.toFixed(3)}
                           </span>
@@ -2359,7 +2346,7 @@ export default function Home() {
                       </div>
 
                       <div className="mt-6">
-                        <h4 className="mb-4 font-semibold">All Interpolation Frames</h4>
+                        <h4 className="mb-4 font-semibold">All interpolation frames</h4>
                         <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
                           {interpolation.frames.map((frame: any, index: number) => (
                             <button
@@ -2396,40 +2383,16 @@ export default function Home() {
 
           {activeTab === "Studio" && (
             <>
-              <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <StatCard
-                  label="MODEL"
-                  value="Conditional DDPM"
-                  description={
-                    engineMode === "browser"
-                      ? "Running in your browser (ONNX)"
-                      : "PyTorch architecture"
-                  }
-                />
-                <StatCard
-                  label="SAMPLING"
-                  value="DDIM"
-                  description="Configurable inference"
-                />
-                <StatCard
-                  label="CLASSES"
-                  value="10 Digits"
-                  description="Labels 0 through 9"
-                />
-              </div>
 
               <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_0.85fr]">
                 <div className="rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
-                  <p className="text-xs tracking-widest text-violet-300">
-                    01 / CONFIGURATION
-                  </p>
                   <h3 className="mt-2 text-xl font-semibold">
-                    Generation Controls
+                    Controls
                   </h3>
 
                   <div className="mb-8 mt-7">
                     <div className="mb-4 flex justify-between text-sm">
-                      <label className="text-slate-300">Select a digit</label>
+                      <p className="text-slate-300">Select a digit</p>
                       <span className="text-violet-300">
                         Selected: {digit}
                       </span>
@@ -2443,7 +2406,7 @@ export default function Home() {
                           aria-pressed={digit === i}
                           aria-label={`Digit ${i}`}
                           className={`aspect-square rounded-xl border text-lg font-semibold transition ${digit === i
-                            ? "border-violet-400 bg-gradient-to-br from-violet-500 to-indigo-600 text-white"
+                            ? "border-violet-500 bg-violet-500 text-black"
                             : "border-white/10 bg-white/[0.035] text-slate-400 hover:border-violet-400/40 hover:bg-white/10 hover:text-white"
                             }`}
                         >
@@ -2456,10 +2419,10 @@ export default function Home() {
                   <div className="space-y-7">
                     <div>
                       <div className="mb-3 flex justify-between text-sm">
-                        <label>Number of samples</label>
+                        <label htmlFor="page-number-of-samples">Number of samples</label>
                         <span>{count}</span>
                       </div>
-                      <input
+                      <input id="page-number-of-samples"
                         type="range"
                         min="1"
                         max="16"
@@ -2471,12 +2434,12 @@ export default function Home() {
 
                     <div>
                       <div className="mb-3 flex justify-between text-sm">
-                        <label>Guidance scale</label>
+                        <label htmlFor="page-guidance-scale-3">Guidance scale</label>
                         <span className="text-violet-300">
                           {guidance.toFixed(1)}
                         </span>
                       </div>
-                      <input
+                      <input id="page-guidance-scale-3"
                         type="range"
                         min="0"
                         max="3"
@@ -2489,10 +2452,10 @@ export default function Home() {
 
                     <div>
                       <div className="mb-3 flex justify-between text-sm">
-                        <label>DDIM sampling steps</label>
+                        <label htmlFor="page-ddim-sampling-steps-2">DDIM sampling steps</label>
                         <span className="text-violet-300">{steps}</span>
                       </div>
-                      <input
+                      <input id="page-ddim-sampling-steps-2"
                         type="range"
                         min="5"
                         max="100"
@@ -2504,9 +2467,9 @@ export default function Home() {
                     </div>
 
                     <div>
-                      <label className="mb-3 block text-sm">Random seed</label>
+                      <label htmlFor="page-random-seed-3" className="mb-3 block text-sm">Random seed</label>
                       <div className="flex gap-3">
-                        <input
+                        <input id="page-random-seed-3"
                           type="number"
                           min="0"
                           max="2147483647"
@@ -2525,9 +2488,11 @@ export default function Home() {
                           onClick={() =>
                             setSeed(Math.floor(Math.random() * 100000))
                           }
-                          className="rounded-xl border border-white/10 bg-white/5 px-4 text-xs"
+                          aria-label="Random seed"
+                          title="Random seed"
+                          className="flex w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 hover:bg-white/5"
                         >
-                          ↻ Random
+                          <Shuffle className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden="true" />
                         </button>
                       </div>
                     </div>
@@ -2538,13 +2503,13 @@ export default function Home() {
                     disabled={
                       loading || compareLoading || backendOnline !== true
                     }
-                    className="mt-9 w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-4 font-semibold shadow-lg shadow-violet-900/30 transition enabled:hover:brightness-110 enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="mt-9 w-full rounded-xl bg-violet-500 text-black py-4 font-semibold transition enabled:hover:bg-violet-400 enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {loading
-                      ? "◌ Generating..."
+                      ? "Generating…"
                       : backendOnline === true
-                        ? "✦ Generate Images"
-                        : "Backend Unavailable"}
+                        ? `Generate ${count} sample${count === 1 ? "" : "s"} of ${digit}`
+                        : "Backend offline"}
                   </button>
 
                   <div className="mt-4 text-center text-xs text-slate-400">
@@ -2559,11 +2524,8 @@ export default function Home() {
                 </div>
 
                 <div className="flex min-h-[480px] flex-col rounded-2xl border border-white/10 bg-surface/70 p-6 sm:p-8">
-                  <p className="text-xs tracking-widest text-violet-300">
-                    02 / OUTPUT
-                  </p>
                   <h3 className="mb-6 mt-2 text-xl font-semibold">
-                    Generation Preview
+                    Samples
                   </h3>
 
                   {loading ? (
@@ -2573,15 +2535,10 @@ export default function Home() {
                     </>
                   ) : images.length === 0 ? (
                     <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-black/20 p-8 text-center">
-                      <div className="mb-6 flex h-24 w-24 items-center justify-center rounded-2xl border border-violet-400/20 bg-violet-500/10 text-5xl text-violet-300">
-                        {digit}
-                      </div>
-                      <h4 className="text-lg font-medium">
-                        Your canvas is ready
-                      </h4>
+                      <h4 className="text-lg font-medium">No samples yet</h4>
                       <p className="mt-2 max-w-xs text-sm text-slate-400">
-                        Pick a digit, adjust the sliders, then press
-                        Generate Images to create new handwritten samples.
+                        Pick a digit and press Generate. Samples and the
+                        classifier&apos;s reading of each one appear here.
                       </p>
                     </div>
                   ) : (
@@ -2603,18 +2560,9 @@ export default function Home() {
                         ))}
                       </div>
 
-                      <div className="mb-4 grid grid-cols-2 gap-3">
-                        <StatCard
-                          label="CLASSIFIER MATCHES"
-                          value={`${matches}/${images.length}`}
-                          description="Predictions matching requested digit"
-                        />
-                        <StatCard
-                          label="INFERENCE TIME"
-                          value={`${elapsed} s`}
-                          description="Generation time"
-                        />
-                      </div>
+                      <p className="mb-4 text-sm tabular-nums text-slate-300">
+                        {matches} of {images.length} read as {digit} by the classifier. Generated in {elapsed} s.
+                      </p>
 
                       <button
                         onClick={() =>
@@ -2629,9 +2577,10 @@ export default function Home() {
                             )
                           )
                         }
-                        className="mt-auto w-full rounded-xl border border-violet-400/20 bg-violet-500/10 py-3 text-sm text-violet-200"
+                        className="mt-auto flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-700 text-sm font-medium hover:bg-white/5"
                       >
-                        ↓ Download All Images
+                        <Download className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+                        Download all
                       </button>
                     </>
                   )}
@@ -2639,11 +2588,8 @@ export default function Home() {
               </div>
 
               <section className="mt-8 rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
-                <p className="text-xs tracking-widest text-violet-300">
-                  03 / MODEL EXPERIMENTATION
-                </p>
                 <h3 className="mt-2 text-2xl font-semibold">
-                  Guidance Comparison
+                  Guidance comparison
                 </h3>
                 <p className="mt-2 text-sm text-slate-400">
                   Compare how classifier-free guidance changes generated
@@ -2652,24 +2598,24 @@ export default function Home() {
 
                 <div className="my-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <StatCard
-                    label="GUIDANCE SCALES"
-                    value="0.0 · 1.2 · 2.0"
+                    label="Guidance scales"
+                    value="0, 1.2 and 2"
                     description="Three configurations"
                   />
                   <StatCard
-                    label="STARTING NOISE"
+                    label="Starting noise"
                     value={`Seed ${seed}`}
                     description="Same seed across experiments"
                   />
                   <StatCard
-                    label="DDIM STEPS"
+                    label="DDIM steps"
                     value={String(steps)}
                     description="Sampling steps"
                   />
                 </div>
 
                 <p className="mb-5 text-sm text-slate-400">
-                  Digit {digit} · {Math.min(count, 8)} samples per guidance
+                  Digit {digit}, {Math.min(count, 8)} samples per guidance
                   scale
                 </p>
 
@@ -2678,11 +2624,11 @@ export default function Home() {
                   disabled={
                     compareLoading || loading || backendOnline !== true
                   }
-                  className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-4 font-semibold shadow-lg shadow-violet-900/30 transition enabled:hover:brightness-110 enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full rounded-xl bg-violet-500 text-black py-4 font-semibold transition enabled:hover:bg-violet-400 enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {compareLoading
-                    ? "◌ Comparing..."
-                    : "✦ Compare Guidance — 0.0 vs 1.2 vs 2.0"}
+                    ? "Comparing…"
+                    : "Compare guidance at 0, 1.2 and 2"}
                 </button>
 
                 {compareLoading && (
@@ -2731,7 +2677,7 @@ export default function Home() {
 
                           <div className="mb-5 h-2 overflow-hidden rounded-full bg-white/10">
                             <div
-                              className="h-full bg-gradient-to-r from-indigo-500 to-violet-500"
+                              className="h-full bg-violet-500"
                               style={{ width: `${accuracy}%` }}
                             />
                           </div>
@@ -2765,11 +2711,8 @@ export default function Home() {
           {activeTab === "Experiment Lab" && (
             <section className="space-y-6">
               <div className="rounded-2xl border border-violet-400/20 bg-surface/80 p-6 sm:p-8">
-                <p className="text-xs tracking-widest text-violet-300">
-                  CONTROLLED DIFFUSION EXPERIMENTS
-                </p>
                 <h3 className="mt-2 text-2xl font-semibold">
-                  Experiment Configuration
+                  Experiment configuration
                 </h3>
                 <p className="mt-2 text-sm text-slate-400">
                   Compare how different diffusion parameters affect generated digits.
@@ -2777,10 +2720,10 @@ export default function Home() {
 
                 <div className="mt-6 grid gap-5 sm:grid-cols-2">
                   <div>
-                    <label className="mb-2 block text-sm text-slate-300">
+                    <label htmlFor="page-experiment-type" className="mb-2 block text-sm text-slate-300">
                       Experiment Type
                     </label>
-                    <select
+                    <select id="page-experiment-type"
                       value={experimentType}
                       onChange={(e) => {
                         setExperimentType(e.target.value);
@@ -2802,10 +2745,10 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm text-slate-300">
+                    <label htmlFor="page-target-digit-0-9" className="mb-2 block text-sm text-slate-300">
                       Target Digit (0–9)
                     </label>
-                    <input
+                    <input id="page-target-digit-0-9"
                       type="number"
                       min="0"
                       max="9"
@@ -2816,10 +2759,10 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm text-slate-300">
+                    <label htmlFor="page-samples-per-configuration-1-8" className="mb-2 block text-sm text-slate-300">
                       Samples per Configuration (1–8)
                     </label>
-                    <input
+                    <input id="page-samples-per-configuration-1-8"
                       type="number"
                       min="1"
                       max="8"
@@ -2838,10 +2781,10 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm text-slate-300">
+                    <label htmlFor="page-comparison-values-comma-separa" className="mb-2 block text-sm text-slate-300">
                       Comparison Values (comma separated)
                     </label>
-                    <input
+                    <input id="page-comparison-values-comma-separa"
                       type="text"
                       value={experimentValues}
                       onChange={(e) => setExperimentValues(e.target.value)}
@@ -2851,10 +2794,10 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm text-slate-300">
+                    <label htmlFor="page-guidance-scale-4" className="mb-2 block text-sm text-slate-300">
                       Guidance Scale
                     </label>
-                    <input
+                    <input id="page-guidance-scale-4"
                       type="number"
                       min="0"
                       max="3"
@@ -2867,10 +2810,10 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm text-slate-300">
+                    <label htmlFor="page-sampling-steps-2" className="mb-2 block text-sm text-slate-300">
                       Sampling Steps
                     </label>
-                    <input
+                    <input id="page-sampling-steps-2"
                       type="number"
                       min="5"
                       max="100"
@@ -2882,10 +2825,10 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm text-slate-300">
+                    <label htmlFor="page-starting-seed" className="mb-2 block text-sm text-slate-300">
                       Starting Seed
                     </label>
-                    <input
+                    <input id="page-starting-seed"
                       type="number"
                       min="0"
                       value={seed}
@@ -2899,7 +2842,7 @@ export default function Home() {
                 <button
                   onClick={runExperiment}
                   disabled={experimentLoading || backendOnline !== true}
-                  className="mt-7 w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-4 font-semibold shadow-lg shadow-violet-900/30 transition enabled:hover:brightness-110 enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="mt-7 w-full rounded-xl bg-violet-500 text-black py-4 font-semibold transition enabled:hover:bg-violet-400 enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {experimentLoading
                     ? "Running Experiment..."
@@ -2939,22 +2882,22 @@ export default function Home() {
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
 
                     <StatCard
-                      label="CONFIGURATIONS"
+                      label="Configurations"
                       value={String(experimentResults.length)}
                       description="Compared settings"
                     />
                     <StatCard
-                      label="TOTAL TIME"
+                      label="Total time"
                       value={`${experimentTime} s`}
                       description="Experiment duration"
                     />
                     <StatCard
-                      label="BEST MATCH RATE"
+                      label="Best match rate"
                       value={`${Math.max(...experimentResults.map((r: any) => r.match_rate))}%`}
                       description="Classifier consistency"
                     />
                     <StatCard
-                      label="BEST CONFIDENCE"
+                      label="Best confidence"
                       value={Math.max(...experimentResults.map((r: any) => r.avg_confidence)).toFixed(3)}
                       description="Average classifier confidence"
                     />
@@ -2969,12 +2912,7 @@ export default function Home() {
                     )[0];
 
                     return (
-                      <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/[0.06] p-5">
-                        <p className="text-xs font-semibold tracking-widest text-emerald-300">
-                          EXPERIMENT RECOMMENDATION
-                        </p>
-
-                        <h4 className="mt-2 text-xl font-semibold">
+                      <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/[0.06] p-5">                        <h4 className="mt-2 text-xl font-semibold">
                           Recommended: {best.parameter} = {best.value}
                         </h4>
 
@@ -2985,17 +2923,17 @@ export default function Home() {
 
                         <div className="mt-4 grid grid-cols-3 gap-3">
                           <StatCard
-                            label="MATCH RATE"
+                            label="Match rate"
                             value={`${best.match_rate}%`}
                             description="Classifier consistency"
                           />
                           <StatCard
-                            label="CONFIDENCE"
+                            label="Confidence"
                             value={best.avg_confidence.toFixed(3)}
                             description="Average confidence"
                           />
                           <StatCard
-                            label="TIME"
+                            label="Time"
                             value={`${best.seconds} s`}
                             description="Inference time"
                           />
@@ -3007,7 +2945,7 @@ export default function Home() {
                   <div className="grid gap-5 lg:grid-cols-2">
                     {/* Match Rate Chart */}
                     <div className="rounded-xl border border-white/10 bg-surface/80 p-5">
-                      <h4 className="mb-5 font-semibold">Match Rate Comparison</h4>
+                      <h4 className="mb-5 font-semibold">Match rate comparison</h4>
 
                       <div className="space-y-5">
                         {experimentResults.map((result: any, index: number) => (
@@ -3022,7 +2960,7 @@ export default function Home() {
                             </div>
                             <div className="h-3 overflow-hidden rounded-full bg-white/10">
                               <div
-                                className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all"
+                                className="h-full rounded-full bg-violet-500 transition-all"
                                 style={{ width: `${result.match_rate}%` }}
                               />
                             </div>
@@ -3033,7 +2971,7 @@ export default function Home() {
 
                     {/* Inference Time Chart */}
                     <div className="rounded-xl border border-white/10 bg-surface/80 p-5">
-                      <h4 className="mb-5 font-semibold">Inference Time Comparison</h4>
+                      <h4 className="mb-5 font-semibold">Inference time comparison</h4>
 
                       <div className="space-y-5">
                         {experimentResults.map((result: any, index: number) => {
@@ -3054,7 +2992,7 @@ export default function Home() {
                               </div>
                               <div className="h-3 overflow-hidden rounded-full bg-white/10">
                                 <div
-                                  className="h-full rounded-full bg-gradient-to-r from-violet-500 to-pink-500 transition-all"
+                                  className="h-full rounded-full bg-slate-300 transition-all"
                                   style={{ width: `${(result.seconds / maxTime) * 100}%` }}
                                 />
                               </div>
@@ -3093,26 +3031,26 @@ export default function Home() {
 
                           const metrics = [
                             {
-                              label: "MATCH RATE",
+                              label: "Match rate",
                               value: `${result.match_rate}%`,
                               description: result.match_rate === bestMatch
-                                ? "★ Best match rate"
+                                ? "Best match rate"
                                 : "Requested digit",
                               isBest: result.match_rate === bestMatch,
                             },
                             {
-                              label: "AVG CONFIDENCE",
+                              label: "Average confidence",
                               value: result.avg_confidence.toFixed(3),
                               description: result.avg_confidence === bestConfidence
-                                ? "★ Highest confidence"
+                                ? "Highest confidence"
                                 : "Classifier confidence",
                               isBest: result.avg_confidence === bestConfidence,
                             },
                             {
-                              label: "INFERENCE TIME",
+                              label: "Inference time",
                               value: `${result.seconds} s`,
                               description: result.seconds === fastestTime
-                                ? "★ Fastest configuration"
+                                ? "Fastest configuration"
                                 : "Generation time",
                               isBest: result.seconds === fastestTime,
                             },
@@ -3122,11 +3060,11 @@ export default function Home() {
                             <div
                               key={metric.label}
                               className={`rounded-xl border p-4 transition-all ${metric.isBest
-                                ? "border-emerald-400/50 bg-emerald-500/10 shadow-[0_0_15px_rgba(52,211,153,0.08)]"
+                                ? "border-emerald-400/50 bg-emerald-500/10"
                                 : "border-white/10 bg-white/[0.03]"
                                 }`}
                             >
-                              <p className="text-xs font-semibold tracking-[0.18em] text-slate-400">
+                              <p className="text-sm text-slate-400">
                                 {metric.label}
                               </p>
                               <p className="mt-3 text-2xl font-bold text-white">
@@ -3157,7 +3095,7 @@ export default function Home() {
               <div className="mt-10 border-t border-slate-700/60 pt-8">
                 <div className="mb-5 flex items-center justify-between">
                   <div>
-                    <h3 className="text-xl font-semibold">Experiment History</h3>
+                    <h3 className="text-xl font-semibold">Experiment history</h3>
                     <p className="mt-1 text-sm text-slate-400">
                       {savedExperiments.length} saved experiments
                     </p>
@@ -3215,22 +3153,22 @@ export default function Home() {
 
                         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                           <StatCard
-                            label="TARGET DIGIT"
+                            label="Target digit"
                             value={String(experiment.digit)}
                             description="Generated class"
                           />
                           <StatCard
-                            label="CONFIGURATIONS"
+                            label="Configurations"
                             value={String(experiment.results.length)}
                             description="Compared settings"
                           />
                           <StatCard
-                            label="TOTAL TIME"
+                            label="Total time"
                             value={`${experiment.totalSeconds.toFixed(2)}s`}
                             description="Experiment duration"
                           />
                           <StatCard
-                            label="SAMPLES"
+                            label="Samples"
                             value={String(experiment.count)}
                             description="Per configuration"
                           />
@@ -3246,8 +3184,8 @@ export default function Home() {
                                 {result.parameter} = {result.value}
                               </p>
                               <p className="mt-1 text-sm text-slate-400">
-                                Match rate: {result.match_rate.toFixed(1)}% ·
-                                Confidence: {result.avg_confidence.toFixed(3)} ·
+                                Match rate: {result.match_rate.toFixed(1)}%,
+                                Confidence: {result.avg_confidence.toFixed(3)},
                                 Time: {result.seconds.toFixed(2)}s
                               </p>
 
@@ -3276,9 +3214,9 @@ export default function Home() {
             <section>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-xl font-semibold">Generation History</h3>
+                  <h3 className="text-xl font-semibold">Generation history</h3>
                   <p className="mt-1 text-sm text-slate-400">
-                    {history.length} saved generations · {totalImages} images
+                    {history.length} saved generations, {totalImages} images
                   </p>
                 </div>
 
@@ -3369,22 +3307,22 @@ export default function Home() {
 
                       <div className="my-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
                         <StatCard
-                          label="GUIDANCE"
+                          label="Guidance"
                           value={record.guidance.toFixed(1)}
                           description="Guidance scale"
                         />
                         <StatCard
-                          label="DDIM STEPS"
+                          label="DDIM steps"
                           value={String(record.steps)}
                           description="Sampling steps"
                         />
                         <StatCard
-                          label="SEED"
+                          label="Seed"
                           value={String(record.seed)}
                           description="Random seed"
                         />
                         <StatCard
-                          label="INFERENCE"
+                          label="Inference"
                           value={`${record.elapsed} s`}
                           description="Generation time"
                         />
@@ -3421,7 +3359,7 @@ export default function Home() {
           {activeTab === "Model Insights" && (
             <section>
               <div className="mb-6">
-                <h3 className="text-xl font-semibold">Your Activity</h3>
+                <h3 className="text-xl font-semibold">Your activity</h3>
                 <p className="mt-1 text-sm text-slate-400">
                   Statistics calculated from your saved generation history.
                 </p>
@@ -3429,22 +3367,22 @@ export default function Home() {
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <StatCard
-                  label="TOTAL GENERATIONS"
+                  label="Total generations"
                   value={String(history.length)}
                   description="Saved sessions"
                 />
                 <StatCard
-                  label="IMAGES GENERATED"
+                  label="Images generated"
                   value={String(totalImages)}
                   description="Total saved samples"
                 />
                 <StatCard
-                  label="AVG. INFERENCE TIME"
+                  label="Average inference time"
                   value={`${averageTime.toFixed(2)} s`}
                   description="Per generation session"
                 />
                 <StatCard
-                  label="CLASSIFIER MATCH RATE"
+                  label="Classifier match rate"
                   value={`${matchRate.toFixed(1)}%`}
                   description={`${totalMatches}/${totalImages} predictions matched`}
                 />
@@ -3452,11 +3390,8 @@ export default function Home() {
 
               <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
                 <div className="rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
-                  <p className="text-xs tracking-widest text-violet-300">
-                    MODEL CONFIGURATION
-                  </p>
                   <h3 className="mt-2 text-xl font-semibold">
-                    Architecture Overview
+                    Architecture overview
                   </h3>
 
                   <div className="mt-6 space-y-4">
@@ -3488,17 +3423,14 @@ export default function Home() {
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
-                  <p className="text-xs tracking-widest text-violet-300">
-                    HOW TO INTERPRET
-                  </p>
                   <h3 className="mt-2 text-xl font-semibold">
-                    Performance Metrics
+                    Performance metrics
                   </h3>
 
                   <div className="mt-6 space-y-5">
                     <div>
                       <h4 className="font-medium text-emerald-300">
-                        Classifier Match Rate
+                        Classifier match rate
                       </h4>
                       <p className="mt-2 text-sm leading-6 text-slate-400">
                         The percentage of generated samples that the separate
@@ -3510,7 +3442,7 @@ export default function Home() {
 
                     <div>
                       <h4 className="font-medium text-violet-300">
-                        Inference Time
+                        Inference time
                       </h4>
                       <p className="mt-2 text-sm leading-6 text-slate-400">
                         Time reported by the backend for generation. It can
@@ -3521,7 +3453,7 @@ export default function Home() {
 
                     <div>
                       <h4 className="font-medium text-violet-300">
-                        Guidance Scale
+                        Guidance scale
                       </h4>
                       <p className="mt-2 text-sm leading-6 text-slate-400">
                         Controls how strongly the conditional label influences
@@ -3534,7 +3466,7 @@ export default function Home() {
               </div>
 
               <div className="mt-8 rounded-2xl border border-violet-400/20 bg-violet-500/[0.06] p-6">
-                <h3 className="font-semibold">Your Experiment Activity</h3>
+                <h3 className="font-semibold">Your experiment activity</h3>
                 <p className="mt-2 text-sm leading-6 text-slate-400">
                   {history.length === 0
                     ? "No generation activity is available yet. Generate samples in Studio to start building your activity statistics."
@@ -3548,7 +3480,7 @@ export default function Home() {
             <section>
               <div className="mb-6">
                 <h3 className="text-xl font-semibold">
-                  Diffusion Model Evaluation
+                  Diffusion model evaluation
                 </h3>
                 <p className="mt-2 text-sm leading-6 text-slate-400">
                   Generate a batch of samples and evaluate class consistency,
@@ -3557,19 +3489,16 @@ export default function Home() {
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
-                <p className="text-xs tracking-widest text-violet-300">
-                  01 / EXPERIMENT CONFIGURATION
-                </p>
                 <h3 className="mt-2 text-xl font-semibold">
-                  Evaluation Parameters
+                  Evaluation parameters
                 </h3>
 
                 <div className="mt-7 grid grid-cols-1 gap-6 sm:grid-cols-2">
                   <div>
-                    <label className="mb-2 block text-sm text-slate-300">
+                    <label htmlFor="page-target-digit-2" className="mb-2 block text-sm text-slate-300">
                       Target digit
                     </label>
-                    <select
+                    <select id="page-target-digit-2"
                       value={evalDigit}
                       onChange={(e) => setEvalDigit(Number(e.target.value))}
                       className="w-full rounded-xl border border-white/10 bg-canvas px-4 py-3 text-sm"
@@ -3583,10 +3512,10 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm text-slate-300">
+                    <label htmlFor="page-number-of-samples-2" className="mb-2 block text-sm text-slate-300">
                       Number of samples: {evalCount}
                     </label>
-                    <input
+                    <input id="page-number-of-samples-2"
                       type="range"
                       min="2"
                       max="64"
@@ -3598,10 +3527,10 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm text-slate-300">
+                    <label htmlFor="page-guidance-scale-5" className="mb-2 block text-sm text-slate-300">
                       Guidance scale: {evalGuidance.toFixed(1)}
                     </label>
-                    <input
+                    <input id="page-guidance-scale-5"
                       type="range"
                       min="0"
                       max="3"
@@ -3615,10 +3544,10 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm text-slate-300">
+                    <label htmlFor="page-ddim-steps-2" className="mb-2 block text-sm text-slate-300">
                       DDIM steps: {evalSteps}
                     </label>
-                    <input
+                    <input id="page-ddim-steps-2"
                       type="range"
                       min="5"
                       max="100"
@@ -3630,10 +3559,10 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm text-slate-300">
+                    <label htmlFor="page-random-seed-4" className="mb-2 block text-sm text-slate-300">
                       Random seed
                     </label>
-                    <input
+                    <input id="page-random-seed-4"
                       type="number"
                       min="0"
                       max="2147483647"
@@ -3654,13 +3583,13 @@ export default function Home() {
                 <button
                   onClick={runEvaluation}
                   disabled={evaluationLoading || backendOnline !== true}
-                  className="mt-8 w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-4 font-semibold shadow-lg shadow-violet-900/30 transition enabled:hover:brightness-110 enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="mt-8 w-full rounded-xl bg-violet-500 text-black py-4 font-semibold transition enabled:hover:bg-violet-400 enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {evaluationLoading
-                    ? "◌ Evaluating model..."
+                    ? "Evaluating…"
                     : backendOnline !== true
-                      ? "Backend Unavailable"
-                      : "✦ Run Model Evaluation"}
+                      ? "Backend offline"
+                      : "Run evaluation"}
                 </button>
 
                 {evaluationError && (
@@ -3673,11 +3602,8 @@ export default function Home() {
               {evaluation && (
                 <div className="mt-8 space-y-6">
                   <div>
-                    <p className="text-xs tracking-widest text-violet-300">
-                      02 / EVALUATION RESULTS
-                    </p>
                     <h3 className="mt-2 text-2xl font-semibold">
-                      Performance Overview
+                      Performance overview
                     </h3>
                     <p className="mt-2 text-sm text-slate-400">
                       Evaluation for digit {evaluation.params.digit} using{" "}
@@ -3687,39 +3613,39 @@ export default function Home() {
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     <StatCard
-                      label="CLASS CONSISTENCY"
+                      label="Class consistency"
                       value={`${evaluation.class_consistency.toFixed(1)}%`}
                       description={`${evaluation.matches}/${evaluation.items.length} classifier matches`}
                     />
                     <StatCard
-                      label="MEAN CONFIDENCE"
+                      label="Mean confidence"
                       value={`${(evaluation.mean_confidence * 100).toFixed(2)}%`}
                       description="Average classifier confidence"
                     />
                     <StatCard
-                      label="DIVERSITY SCORE"
+                      label="Diversity score"
                       value={evaluation.diversity_mean_pairwise_l1.toFixed(4)}
                       description="Mean pairwise pixel L1 distance"
                     />
                     <StatCard
-                      label="PIXEL VARIATION"
+                      label="Pixel variation"
                       value={evaluation.mean_pixel_std.toFixed(4)}
                       description="Mean pixel standard deviation"
                     />
                     <StatCard
-                      label="INFERENCE TIME"
+                      label="Inference time"
                       value={`${evaluation.seconds.toFixed(2)} s`}
                       description="Total evaluation time"
                     />
                     <StatCard
-                      label="THROUGHPUT"
+                      label="Throughput"
                       value={`${evaluation.images_per_second.toFixed(2)}`}
                       description="Images generated per second"
                     />
                   </div>
 
                   <div className="rounded-xl border border-white/10 bg-surface/80 p-5">
-                    <h4 className="font-semibold">Evaluation Configuration</h4>
+                    <h4 className="font-semibold">Evaluation configuration</h4>
                     <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-5">
                       {[
                         ["Digit", evaluation.params.digit],
@@ -3741,7 +3667,7 @@ export default function Home() {
 
                   <div className="rounded-2xl border border-white/10 bg-surface/80 p-6">
                     <h4 className="text-lg font-semibold">
-                      Generated Evaluation Samples
+                      Generated evaluation samples
                     </h4>
                     <p className="mt-1 text-sm text-slate-400">
                       Green border indicates the classifier predicted the

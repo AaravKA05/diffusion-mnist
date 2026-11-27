@@ -2,13 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import {
+  Download,
+} from "lucide-react";
 type Opened = {
   src: string;
   alt: string;
   caption: string;
 };
 
-/** Text that sits with the image in its card, e.g. "Read as 7 · 99.8%". */
+/** Text that sits with the image in its card, e.g. "Read as 7, 99.8%". */
 function findCaption(img: HTMLImageElement) {
   const figcaption = img.closest("figure")?.querySelector("figcaption")?.textContent;
   if (figcaption) return figcaption.trim();
@@ -19,7 +22,7 @@ function findCaption(img: HTMLImageElement) {
     .filter((el) => el !== img && el.tagName !== "BUTTON")
     .map((el) => el.textContent?.trim() ?? "")
     .filter(Boolean);
-  return parts.join(" · ").slice(0, 120);
+  return parts.join(", ").slice(0, 120);
 }
 
 /**
@@ -80,7 +83,7 @@ export default function ImageLightbox() {
       role="dialog"
       aria-modal="true"
       aria-label={opened.alt || "Enlarged image"}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
       onClick={close}
     >
       <div
@@ -101,19 +104,20 @@ export default function ImageLightbox() {
           <a
             href={opened.src}
             download="diffusionlab-image.png"
-            className="flex-1 rounded-xl border border-white/10 bg-white/5 py-2.5 text-center text-sm text-slate-200 hover:bg-white/10"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/10 py-2.5 text-sm text-slate-200 hover:bg-white/5"
           >
-            ↓ Download
+            <Download className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+            Download
           </a>
           <button
             ref={closeRef}
             onClick={close}
-            className="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-2.5 text-sm font-semibold"
+            className="flex-1 rounded-xl bg-violet-500 text-black py-2.5 text-sm font-semibold"
           >
             Close
           </button>
         </div>
-        <p className="mt-3 text-center text-xs text-slate-500">Press Esc or click outside to close</p>
+        <p className="mt-3 text-center text-xs text-slate-400">Press Esc or click outside to close</p>
       </div>
     </div>
   );
