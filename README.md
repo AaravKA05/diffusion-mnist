@@ -23,6 +23,7 @@ DiffusionLab demonstrates how a neural network learns to reverse a gradual noise
 - **Recognition timeline:** classifies the model's clean-image guess at every sampling step to show *when* a digit becomes readable.
 - **Sketch to digit:** SDEdit-style clean-up of a hand-drawn digit, with no retraining.
 - VAE baseline, nearest-neighbour copy check, and per-digit diagnosis.
+- **2D playground:** the same DDPM recipe on a 2-D swiss roll with a tiny MLP, so every reverse step and the effect of the noise schedule can be seen.
 
 ## DiffusionLab Features
 
@@ -35,6 +36,7 @@ DiffusionLab demonstrates how a neural network learns to reverse a gradual noise
 - **Feature Evolution:** Observe how selected feature channels change across diffusion timesteps.
 - **Recognition Timeline:** See at which sampling step the classifier starts reading the requested digit, for up to four guidance scales.
 - **Sketch to Digit:** Draw a digit with the mouse, a finger or a pen and let the model clean it up.
+- **2D Playground:** Watch 2,000 points go from noise to a swiss roll, scrub any timestep, and compare three noise schedules.
 - **Works without a server:** a progress bar shows each step while the model runs in the browser; any generated image can be clicked to view it large.
 
 ## Technology Stack
@@ -242,6 +244,13 @@ The Representation Explorer visualizes internal U-Net activations. It is not a V
 - The model adds noise up to a chosen step (edit strength) and then denoises it (SDEdit).
 - Pick a target digit (uses guidance) or let the model decide.
 - Low strength keeps your shape; high strength lets the model redraw it.
+
+### 9. 2D Playground
+
+- The full algorithm on 2-D points instead of images: 100 steps, an MLP (`3 → 128 → 128 → 2`, input `x, y, t/T`) in place of the U-Net.
+- Scrub the timestep slider in either direction, or play the forward (noising) or reverse (denoising) process.
+- Switch between three trained schedules (gentle, linear, aggressive) and see how much signal each keeps at every step.
+- The MLP runs in plain TypeScript on the page (no server, no ONNX runtime); the weights are a 290 KB JSON file written by `toy2d.py`.
 
 ---
 
@@ -591,6 +600,28 @@ All 12 results, and 4 more with the digit left to the model, were read as 7 with
 
 The browser engine is about four times slower than PyTorch on the same CPU, so browser mode starts with lighter defaults (4 images, 20 steps). Phones were not measured. The first visit downloads about 25 MB (model and runtime).
 
+### 16. 2D Swiss Roll: Noise Schedules
+
+`python toy2d.py`: 2,000 swiss-roll points, `T = 100`, linear β from 1e-4 to β_T, MLP `3 → 128 → 128 → 2`, Adam 1e-3 with cosine decay, 30,000 full-batch steps (about 70 s per schedule on a 2-core CPU). Sampling: 2,000 points, DDPM, seed 1.
+
+[![Reverse diffusion in 2D](results/toy2d_reverse.png)](results/toy2d_reverse.png)
+
+[![Noise schedules in 2D](results/toy2d_schedules.png)](results/toy2d_schedules.png)
+
+| Schedule | β_T | ᾱ_T | Sample → data | Data → sample |
+|---|---|---|---|---|
+| Gentle | 0.02 | 0.36 | 0.013 | 0.011 |
+| Linear | 0.2 | 2.1e-5 | 0.027 | 0.013 |
+| Aggressive | 0.5 | 4.5e-14 | 0.043 | 0.015 |
+| Real data vs a second real draw | | | 0.011 | 0.011 |
+
+*Sample → data* is the mean distance from each generated point to its nearest training point (lower means samples sit on the roll); *data → sample* is the reverse (lower means the whole roll is covered). Full numbers in `results/toy2d_metrics.json`.
+
+- **Aggressive is the blurriest.** Its signal is gone by about step 50, so only the first half of the steps carry information about the shape.
+- **Gentle scored best here, even though it never reaches pure noise** (60% of the signal is left at t = 100, so sampling starts from the wrong distribution). In 2-D this mismatch is small: x_T has a per-axis variance close to 1 anyway. I do not expect this to carry over to images, and the metric only checks that points are near the roll, not that their density along it matches.
+- **Training length mattered more than expected.** At 8,000 steps the linear schedule gave a visibly blurry roll (sample → data 0.059); 30,000 steps brought it to 0.027. The per-timestep loss was highest at small t, where the noise is hardest to see.
+- The browser MLP matches PyTorch to within 2.2e-6 on the training points at t = 0, 50 and 99, for all three schedules.
+
 ### Side Note: Earlier 16x16 Runs on Laptop CPU
 
 Before moving to Colab I trained 16x16 models (`BASE_CH = 32`) on a laptop CPU.
@@ -663,6 +694,7 @@ diffusion-mnist/
 ├── server2.py                 # Current FastAPI backend
 ├── lab_features.py            # Recognition timeline and sketch to digit
 ├── export_onnx.py             # Export models to ONNX for browser mode
+├── toy2d.py                   # 2D swiss-roll diffusion and 2D playground weights
 ├── compare.py                 # EMA vs non-EMA comparison
 ├── compare_ddim.py             # DDPM vs DDIM comparison
 ├── check_setup.py             # Environment and setup checks
