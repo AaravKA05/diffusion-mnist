@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 
+import {
+  ScanEye,
+  Shuffle,
+} from "lucide-react";
 import { apiFetch, getEngineMode } from "@/lib/engine/apiClient";
 
 type TimelinePoint = {
@@ -233,7 +237,7 @@ function TimelineChart({ result }: { result: TimelineResult }) {
                     }}
                 >
                     <p className="mb-1 text-slate-400">
-                        Step {hoverStep} · t = {result.series[0].points[hoverStep - 1]?.timestep}
+                        Step {hoverStep}, t = {result.series[0].points[hoverStep - 1]?.timestep}
                     </p>
                     {hoverPoints.map(
                         (h) =>
@@ -302,12 +306,8 @@ export default function RecognitionTimeline({
 
     return (
         <section className="space-y-6">
-            <div className="rounded-2xl border border-violet-400/20 bg-violet-500/6 p-6 sm:p-8">
-                <p className="text-xs tracking-widest text-violet-300">
-                    ANALYSIS / WHEN DOES THE DIGIT APPEAR?
-                </p>
-                <h3 className="mt-2 text-2xl font-semibold">Recognition Timeline</h3>
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
+            <div>
+                <p className="max-w-3xl text-sm leading-6 text-slate-400">
                     At every DDIM step the model makes a guess of the final clean image.
                     The CNN classifier reads that guess and reports how likely it is to be
                     the requested digit. The step where the line crosses 90% and stays
@@ -318,12 +318,11 @@ export default function RecognitionTimeline({
 
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-[0.75fr_1.25fr]">
                 <div className="rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
-                    <p className="text-xs tracking-widest text-violet-300">01 / CONFIGURATION</p>
-                    <h3 className="mt-2 text-xl font-semibold">Timeline Settings</h3>
+                    <h3 className="mt-2 text-xl font-semibold">Timeline settings</h3>
 
                     <div className="mt-7">
                         <div className="mb-3 flex justify-between text-sm">
-                            <label>Target digit</label>
+                            <p>Target digit</p>
                             <span className="text-violet-300">{digit}</span>
                         </div>
                         <div className="grid grid-cols-5 gap-2">
@@ -346,7 +345,7 @@ export default function RecognitionTimeline({
 
                     <div className="mt-7">
                         <div className="mb-3 flex justify-between text-sm">
-                            <label>Guidance scales to compare</label>
+                            <p>Guidance scales to compare</p>
                             <span className="text-slate-400">{ws.length}/4 selected</span>
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -359,7 +358,7 @@ export default function RecognitionTimeline({
                                         onClick={() => toggleW(w)}
                                         aria-pressed={active}
                                         className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition ${active
-                                            ? "border-violet-400/60 bg-violet-500/15 text-white"
+                                            ? "border-violet-500 bg-violet-500 text-black"
                                             : "border-white/10 bg-white/3 text-slate-400 hover:bg-white/10 hover:text-white"
                                             }`}
                                     >
@@ -429,9 +428,11 @@ export default function RecognitionTimeline({
                                 />
                                 <button
                                     onClick={() => setSeed(Math.floor(Math.random() * 100000))}
-                                    className="rounded-xl border border-white/10 bg-white/5 px-4 text-xs hover:bg-white/10"
+                                    aria-label="Random seed"
+                                    title="Random seed"
+                                    className="flex w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 hover:bg-white/5"
                                 >
-                                    ↻ Random
+                                    <Shuffle className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden="true" />
                                 </button>
                             </div>
                         </div>
@@ -440,12 +441,12 @@ export default function RecognitionTimeline({
                     <button
                         onClick={run}
                         disabled={loading || backendOnline !== true}
-                        className="mt-8 w-full rounded-xl bg-linear-to-r from-indigo-600 to-violet-600 py-4 font-semibold shadow-lg shadow-violet-900/30 transition enabled:hover:brightness-110 enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                        className="mt-8 w-full rounded-xl bg-violet-500 text-black py-4 font-semibold transition enabled:hover:bg-violet-400 enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         {loading
-                            ? "◌ Tracing..."
+                            ? "Tracing…"
                             : backendOnline === true
-                                ? "✦ Trace Recognition"
+                                ? "Trace recognition"
                                 : "Backend Unavailable"}
                     </button>
 
@@ -457,7 +458,6 @@ export default function RecognitionTimeline({
                 </div>
 
                 <div className="flex min-h-100 flex-col rounded-2xl border border-white/10 bg-surface/70 p-6 sm:p-8">
-                    <p className="text-xs tracking-widest text-violet-300">02 / RESULT</p>
                     <h3 className="mt-2 text-xl font-semibold">
                         Probability of digit {result ? result.digit : digit} at each step
                     </h3>
@@ -471,13 +471,11 @@ export default function RecognitionTimeline({
                         </div>
                     ) : !result ? (
                         <div className="mt-6 flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-black/20 p-8 text-center">
-                            <div className="flex h-24 w-24 items-center justify-center rounded-2xl border border-violet-400/20 bg-violet-500/10 text-4xl text-violet-300">
-                                ⟿
-                            </div>
+                            <ScanEye className="h-8 w-8 text-slate-400" strokeWidth={1.5} aria-hidden="true" />
                             <h4 className="mt-6 text-lg font-medium">Ready to trace</h4>
                             <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
                                 Pick a digit and up to four guidance scales, then press Trace
-                                Recognition to see when each one becomes readable.
+                                recognition to see when each one becomes readable.
                             </p>
                         </div>
                     ) : (
@@ -504,9 +502,9 @@ export default function RecognitionTimeline({
                             <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 {result.series.map((s, i) => (
                                     <div key={s.w} className="rounded-xl border border-white/10 bg-white/3 p-4">
-                                        <p className="flex items-center gap-2 text-xs font-semibold tracking-widest text-slate-400">
+                                        <p className="flex items-center gap-2 text-sm text-slate-400">
                                             <span className="h-2 w-2 rounded-full" style={{ background: SERIES_COLORS[i] }} />
-                                            GUIDANCE w = {s.w}
+                                            Guidance w = {s.w}
                                         </p>
                                         <p className="mt-2 text-lg font-semibold">
                                             {s.lock_in_step
@@ -515,9 +513,9 @@ export default function RecognitionTimeline({
                                         </p>
                                         <p className="mt-1 text-xs text-slate-400">
                                             {s.lock_in_step
-                                                ? `${Math.round((s.lock_in_step / result.steps) * 100)}% of the way through sampling · t = ${s.points[s.lock_in_step - 1].timestep}`
+                                                ? `${Math.round((s.lock_in_step / result.steps) * 100)}% of the way through sampling, t = ${s.points[s.lock_in_step - 1].timestep}`
                                                 : "Fewer than 90% of samples read as the digit at the end"}
-                                            {" · "}final {s.final_matches}/{result.count} correct
+                                            {", "}final {s.final_matches}/{result.count} correct
                                         </p>
                                     </div>
                                 ))}
@@ -525,7 +523,7 @@ export default function RecognitionTimeline({
 
                             <div className="mt-4 flex items-center justify-between text-xs text-slate-400">
                                 <span className="tabular-nums">
-                                    {result.count} samples per line · seed {result.seed} · {result.seconds}s
+                                    {result.count} samples per line, seed {result.seed}, {result.seconds} s
                                 </span>
                                 <button
                                     onClick={() => setShowTable((v) => !v)}
@@ -545,7 +543,7 @@ export default function RecognitionTimeline({
                                                 <th className="px-3 py-2 font-medium">t</th>
                                                 {result.series.map((s) => (
                                                     <th key={s.w} className="px-3 py-2 font-medium">
-                                                        w={s.w} prob · match
+                                                        w={s.w} probability, match
                                                     </th>
                                                 ))}
                                             </tr>
@@ -557,7 +555,7 @@ export default function RecognitionTimeline({
                                                     <td className="px-3 py-1.5">{p.timestep}</td>
                                                     {result.series.map((s) => (
                                                         <td key={s.w} className="px-3 py-1.5">
-                                                            {(s.points[k].target_prob * 100).toFixed(1)}% ·{" "}
+                                                            {(s.points[k].target_prob * 100).toFixed(1)}%,{" "}
                                                             {Math.round(s.points[k].match_rate * 100)}%
                                                         </td>
                                                     ))}
@@ -574,7 +572,6 @@ export default function RecognitionTimeline({
 
             {result && !loading && (
                 <div className="dl-fade-in rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
-                    <p className="text-xs tracking-widest text-violet-300">03 / WHAT THE MODEL IS GUESSING</p>
                     <h3 className="mt-2 text-xl font-semibold">Clean-image guess at each stage</h3>
                     <p className="mt-2 text-sm text-slate-400">
                         First sample of each run. The label under each image is what the
@@ -601,7 +598,7 @@ export default function RecognitionTimeline({
                                                 className="aspect-square w-full rounded-lg object-contain"
                                             />
                                             <figcaption className="mt-2 text-center text-xs text-slate-400">
-                                                Step {pv.step} · reads {pv.pred} ({Math.round(pv.conf * 100)}%)
+                                                Step {pv.step}: reads {pv.pred} ({Math.round(pv.conf * 100)}%)
                                             </figcaption>
                                         </figure>
                                     ))}

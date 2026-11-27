@@ -2,6 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import {
+  ArrowRight,
+  PenLine,
+  Shuffle,
+  X,
+} from "lucide-react";
 import { apiFetch } from "@/lib/engine/apiClient";
 
 type SketchItem = {
@@ -150,12 +156,8 @@ export default function SketchToDigit({
 
     return (
         <section className="space-y-6">
-            <div className="rounded-2xl border border-violet-400/20 bg-violet-500/6 p-6 sm:p-8">
-                <p className="text-xs tracking-widest text-violet-300">
-                    GUIDED EDITING / SDEDIT
-                </p>
-                <h3 className="mt-2 text-2xl font-semibold">Sketch to Digit</h3>
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
+            <div>
+                <p className="max-w-3xl text-sm leading-6 text-slate-400">
                     Draw a rough digit. The model adds noise to your sketch, then removes
                     it again with the reverse diffusion process. With low strength it
                     only tidies your strokes; with high strength it redraws the digit
@@ -166,8 +168,7 @@ export default function SketchToDigit({
 
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-[0.9fr_1.1fr]">
                 <div className="rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
-                    <p className="text-xs tracking-widest text-violet-300">01 / DRAW</p>
-                    <h3 className="mt-2 text-xl font-semibold">Your Sketch</h3>
+                    <h3 className="mt-2 text-xl font-semibold">Your sketch</h3>
 
                     <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:items-start">
                         <canvas
@@ -184,9 +185,10 @@ export default function SketchToDigit({
                         <div className="flex w-full flex-row gap-2 sm:w-auto sm:flex-col">
                             <button
                                 onClick={resetCanvas}
-                                className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/10 sm:flex-none"
+                                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/10 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5 sm:flex-none"
                             >
-                                ✕ Clear
+                                <X className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+                                Clear
                             </button>
                             <p className="hidden max-w-40 text-xs leading-5 text-slate-400 sm:block">
                                 Draw big and centred, like a handwritten digit. Thick strokes work best.
@@ -196,7 +198,7 @@ export default function SketchToDigit({
 
                     <div className="mt-7">
                         <div className="mb-3 flex justify-between text-sm">
-                            <label>Turn it into</label>
+                            <p>Turn it into</p>
                             <span className="text-violet-300">
                                 {digit === null ? "Model decides" : `Digit ${digit}`}
                             </span>
@@ -206,7 +208,7 @@ export default function SketchToDigit({
                                 onClick={() => setDigit(null)}
                                 aria-pressed={digit === null}
                                 className={`col-span-6 rounded-xl border py-2 text-sm font-medium transition sm:col-span-1 ${digit === null
-                                    ? "border-violet-400 bg-violet-500/30 text-white"
+                                    ? "border-violet-500 bg-violet-500 text-black"
                                     : "border-white/10 bg-white/3 text-slate-400 hover:border-violet-400/40 hover:bg-white/10 hover:text-white"
                                     }`}
                             >
@@ -219,7 +221,7 @@ export default function SketchToDigit({
                                     aria-pressed={digit === i}
                                     aria-label={`Digit ${i}`}
                                     className={`rounded-xl border py-2 text-base font-semibold transition ${digit === i
-                                        ? "border-violet-400 bg-violet-500/30 text-white"
+                                        ? "border-violet-500 bg-violet-500 text-black"
                                         : "border-white/10 bg-white/3 text-slate-400 hover:border-violet-400/40 hover:bg-white/10 hover:text-white"
                                         }`}
                                 >
@@ -319,9 +321,11 @@ export default function SketchToDigit({
                                 />
                                 <button
                                     onClick={() => setSeed(Math.floor(Math.random() * 100000))}
-                                    className="rounded-xl border border-white/10 bg-white/5 px-4 text-xs hover:bg-white/10"
+                                    aria-label="Random seed"
+                                    title="Random seed"
+                                    className="flex w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 hover:bg-white/5"
                                 >
-                                    ↻ Random
+                                    <Shuffle className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden="true" />
                                 </button>
                             </div>
                         </div>
@@ -330,14 +334,14 @@ export default function SketchToDigit({
                     <button
                         onClick={run}
                         disabled={loading || !hasInk || backendOnline !== true}
-                        className="mt-8 w-full rounded-xl bg-linear-to-r from-indigo-600 to-violet-600 py-4 font-semibold shadow-lg shadow-violet-900/30 transition enabled:hover:brightness-110 enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                        className="mt-8 w-full rounded-xl bg-violet-500 text-black py-4 font-semibold transition enabled:hover:bg-violet-400 enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         {loading
-                            ? "◌ Denoising your sketch..."
+                            ? "Cleaning up your sketch…"
                             : backendOnline !== true
                                 ? "Backend Unavailable"
                                 : hasInk
-                                    ? "✦ Clean Up Sketch"
+                                    ? "Clean up sketch"
                                     : "Draw something first"}
                     </button>
 
@@ -349,8 +353,7 @@ export default function SketchToDigit({
                 </div>
 
                 <div className="flex min-h-120 flex-col rounded-2xl border border-white/10 bg-surface/70 p-6 sm:p-8">
-                    <p className="text-xs tracking-widest text-violet-300">02 / OUTPUT</p>
-                    <h3 className="mt-2 text-xl font-semibold">From Sketch to Digit</h3>
+                    <h3 className="mt-2 text-xl font-semibold">From sketch to digit</h3>
 
                     {loading ? (
                         <div className="mt-6" aria-hidden="true">
@@ -371,9 +374,7 @@ export default function SketchToDigit({
                         </div>
                     ) : !result ? (
                         <div className="mt-6 flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-black/20 p-8 text-center">
-                            <div className="flex h-24 w-24 items-center justify-center rounded-2xl border border-violet-400/20 bg-violet-500/10 text-4xl text-violet-300">
-                                ✎
-                            </div>
+                            <PenLine className="h-8 w-8 text-slate-400" strokeWidth={1.5} aria-hidden="true" />
                             <h4 className="mt-6 text-lg font-medium">Draw, then clean up</h4>
                             <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
                                 Your processed sketch, the noisy version the model starts from,
@@ -390,10 +391,10 @@ export default function SketchToDigit({
                                         className="aspect-square w-full rounded-lg object-contain"
                                     />
                                     <figcaption className="mt-2 text-center text-xs text-slate-400">
-                                        Your sketch · classifier reads {result.sketch_pred} ({Math.round(result.sketch_conf * 100)}%)
+                                        Your sketch. Classifier reads {result.sketch_pred} ({Math.round(result.sketch_conf * 100)}%)
                                     </figcaption>
                                 </figure>
-                                <span className="text-xl text-violet-300" aria-hidden="true">→</span>
+                                <ArrowRight className="h-5 w-5 text-slate-400" strokeWidth={1.75} aria-hidden="true" />
                                 <figure className="rounded-xl border border-white/10 bg-black/40 p-2">
                                     <img
                                         src={`data:image/png;base64,${result.noised}`}
@@ -409,8 +410,8 @@ export default function SketchToDigit({
                             <p className="mt-6 mb-3 text-sm text-slate-300">
                                 Cleaned up in {result.steps_used} DDIM steps
                                 {result.params.digit === null
-                                    ? " · model chose the digit"
-                                    : ` · target ${result.params.digit} · ${result.matches}/${result.items.length} read as ${result.params.digit}`}
+                                    ? ", model chose the digit"
+                                    : `, target ${result.params.digit}, ${result.matches}/${result.items.length} read as ${result.params.digit}`}
                             </p>
 
                             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -433,7 +434,7 @@ export default function SketchToDigit({
                                                 className="aspect-square w-full rounded-lg object-contain"
                                             />
                                             <figcaption className="mt-2 text-center text-xs text-slate-400">
-                                                Read as {item.pred} · {(item.conf * 100).toFixed(1)}%
+                                                Read as {item.pred}, {(item.conf * 100).toFixed(1)}%
                                             </figcaption>
                                         </figure>
                                     );
@@ -441,7 +442,7 @@ export default function SketchToDigit({
                             </div>
 
                             <p className="mt-4 text-xs text-slate-400 tabular-nums">
-                                Strength {result.params.strength.toFixed(2)} · seed {result.params.seed} · {result.seconds}s
+                                Strength {result.params.strength.toFixed(2)}, seed {result.params.seed}, {result.seconds} s
                             </p>
                         </div>
                     )}
