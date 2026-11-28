@@ -197,6 +197,41 @@ main img[src^="data:image"] {
   animation: dl-indeterminate 1.2s ease-in-out infinite;
 }
 
+/* Frosted glass tiles: translucent navy cards over the soft background
+   glows in page.tsx. Same colours as the solid theme; the border classes on
+   each card keep a clear edge. */
+@layer components {
+  .glass-tile,
+  .glass-tile-sm {
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    backdrop-filter: blur(20px) saturate(140%);
+    box-shadow:
+      inset 0 1px 0 rgb(243 236 224 / 0.1),
+      inset 0 0 0 1px rgb(243 236 224 / 0.03),
+      0 16px 40px -20px rgb(0 0 0 / 0.6);
+  }
+
+  .glass-tile {
+    background: linear-gradient(180deg, rgb(26 37 71 / 0.55), rgb(17 27 56 / 0.4));
+  }
+
+  .glass-tile-sm {
+    background: rgb(26 37 71 / 0.4);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+}
+
+/* Solid cards when the OS asks for less transparency */
+@media (prefers-reduced-transparency: reduce) {
+  .glass-tile,
+  .glass-tile-sm {
+    background: #111b38;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
 /* Respect "reduce motion" in the OS settings */
 @media (prefers-reduced-motion: reduce) {
 

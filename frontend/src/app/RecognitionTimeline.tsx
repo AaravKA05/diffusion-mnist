@@ -317,7 +317,7 @@ export default function RecognitionTimeline({
             </div>
 
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-[0.75fr_1.25fr]">
-                <div className="rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
+                <div className="rounded-2xl border border-white/10 glass-tile p-6 sm:p-8">
                     <h3 className="mt-2 text-xl font-semibold">Timeline settings</h3>
 
                     <div className="mt-7">
@@ -457,7 +457,7 @@ export default function RecognitionTimeline({
                     )}
                 </div>
 
-                <div className="flex min-h-100 flex-col rounded-2xl border border-white/10 bg-surface/70 p-6 sm:p-8">
+                <div className="flex min-h-100 flex-col rounded-2xl border border-white/10 glass-tile p-6 sm:p-8">
                     <h3 className="mt-2 text-xl font-semibold">
                         Probability of digit {result ? result.digit : digit} at each step
                     </h3>
@@ -571,7 +571,7 @@ export default function RecognitionTimeline({
             </div>
 
             {result && !loading && (
-                <div className="dl-fade-in rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
+                <div className="dl-fade-in rounded-2xl border border-white/10 glass-tile p-6 sm:p-8">
                     <h3 className="mt-2 text-xl font-semibold">Clean-image guess at each stage</h3>
                     <p className="mt-2 text-sm text-slate-400">
                         First sample of each run. The label under each image is what the

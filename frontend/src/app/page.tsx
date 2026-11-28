@@ -1257,6 +1257,12 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-canvas text-white selection:bg-violet-500 selection:text-black">
+      {/* Soft glows behind the glass tiles (theme colours, low opacity) */}
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute left-[20%] top-24 h-[26rem] w-[26rem] rounded-full bg-violet-500/15 blur-[140px]" />
+        <div className="absolute -right-20 top-1/3 h-[32rem] w-[32rem] rounded-full bg-[#24346b] opacity-70 blur-[140px]" />
+        <div className="absolute bottom-[-6rem] left-1/2 h-96 w-96 rounded-full bg-violet-400/10 blur-[140px]" />
+      </div>
 
       <div className="relative mx-auto flex min-h-screen max-w-[1600px]" inert={showLaunch}>
         <aside className="hidden w-64 shrink-0 border-r border-slate-700 bg-slate-900 p-5 lg:flex lg:flex-col">
@@ -1454,7 +1460,7 @@ export default function Home() {
               </div>
 
               <div className="grid grid-cols-1 gap-6 xl:grid-cols-[0.8fr_1.2fr]">
-                <div className="rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
+                <div className="rounded-2xl border border-white/10 glass-tile p-6 sm:p-8">
                   <h3 className="mt-2 text-xl font-semibold">
                     Visualizer settings
                   </h3>
@@ -1594,7 +1600,7 @@ export default function Home() {
                   )}
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
+                <div className="rounded-2xl border border-white/10 glass-tile p-6 sm:p-8">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <h3 className="mt-2 text-xl font-semibold">
@@ -1837,7 +1843,7 @@ export default function Home() {
               </div>
 
               {/* Representation Controls */}
-              <div className="mt-6 rounded-2xl border border-white/10 bg-surface/80 p-6 space-y-6">
+              <div className="mt-6 rounded-2xl border border-white/10 glass-tile p-6 space-y-6">
                 <div>
                   <h3 className="text-lg font-semibold">Analysis configuration</h3>
                   <p className="mt-1 text-sm text-slate-400">
@@ -1965,7 +1971,7 @@ export default function Home() {
                     </div>
 
                     {/* Channel Heatmaps */}
-                    <div className="rounded-2xl border border-white/10 bg-surface/80 p-6">
+                    <div className="rounded-2xl border border-white/10 glass-tile p-6">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <h3 className="text-lg font-semibold">
@@ -2051,7 +2057,7 @@ export default function Home() {
                   </div>
 
                   {/* Timestep Feature Evolution */}
-                  <div className="rounded-2xl border border-violet-400/20 bg-surface/80 p-6 space-y-6">
+                  <div className="rounded-2xl border border-violet-400/20 glass-tile p-6 space-y-6">
                     <div>
                       <h3 className="mt-2 text-xl font-semibold">
                         Timestep-wise feature evolution
@@ -2433,7 +2439,7 @@ export default function Home() {
             <>
 
               <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_0.85fr]">
-                <div className="rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
+                <div className="rounded-2xl border border-white/10 glass-tile p-6 sm:p-8">
                   <h3 className="mt-2 text-xl font-semibold">
                     Controls
                   </h3>
@@ -2571,7 +2577,7 @@ export default function Home() {
                   )}
                 </div>
 
-                <div className="flex min-h-[480px] flex-col rounded-2xl border border-white/10 bg-surface/70 p-6 sm:p-8">
+                <div className="flex min-h-[480px] flex-col rounded-2xl border border-white/10 glass-tile p-6 sm:p-8">
                   <h3 className="mb-6 mt-2 text-xl font-semibold">
                     Samples
                   </h3>
@@ -2638,7 +2644,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <section className="mt-8 rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
+              <section className="mt-8 rounded-2xl border border-white/10 glass-tile p-6 sm:p-8">
                 <h3 className="mt-2 text-2xl font-semibold">
                   Guidance comparison
                 </h3>
@@ -2761,7 +2767,7 @@ export default function Home() {
 
           {activeTab === "Experiment Lab" && (
             <section className="space-y-6">
-              <div className="rounded-2xl border border-violet-400/20 bg-surface/80 p-6 sm:p-8">
+              <div className="rounded-2xl border border-violet-400/20 glass-tile p-6 sm:p-8">
                 <h3 className="mt-2 text-2xl font-semibold">
                   Experiment configuration
                 </h3>
@@ -2995,7 +3001,7 @@ export default function Home() {
 
                   <div className="grid gap-5 lg:grid-cols-2">
                     {/* Match Rate Chart */}
-                    <div className="rounded-xl border border-white/10 bg-surface/80 p-5">
+                    <div className="rounded-xl border border-white/10 glass-tile-sm p-5">
                       <h4 className="mb-5 font-semibold">Match rate comparison</h4>
 
                       <div className="space-y-5">
@@ -3021,7 +3027,7 @@ export default function Home() {
                     </div>
 
                     {/* Inference Time Chart */}
-                    <div className="rounded-xl border border-white/10 bg-surface/80 p-5">
+                    <div className="rounded-xl border border-white/10 glass-tile-sm p-5">
                       <h4 className="mb-5 font-semibold">Inference time comparison</h4>
 
                       <div className="space-y-5">
@@ -3057,7 +3063,7 @@ export default function Home() {
                   {experimentResults.map((result: any, index: number) => (
                     <div
                       key={index}
-                      className="rounded-xl border border-white/10 bg-surface/80 p-5"
+                      className="rounded-xl border border-white/10 glass-tile-sm p-5"
                     >
                       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                         <h4 className="text-lg font-semibold">
@@ -3311,7 +3317,7 @@ export default function Home() {
                   {history.map((record) => (
                     <div
                       key={record.id}
-                      className="rounded-2xl border border-white/10 bg-surface/70 p-5 sm:p-7"
+                      className="rounded-2xl border border-white/10 glass-tile p-5 sm:p-7"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
@@ -3440,7 +3446,7 @@ export default function Home() {
               </div>
 
               <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
-                <div className="rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
+                <div className="rounded-2xl border border-white/10 glass-tile p-6 sm:p-8">
                   <h3 className="mt-2 text-xl font-semibold">
                     Architecture overview
                   </h3>
@@ -3473,7 +3479,7 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
+                <div className="rounded-2xl border border-white/10 glass-tile p-6 sm:p-8">
                   <h3 className="mt-2 text-xl font-semibold">
                     Performance metrics
                   </h3>
@@ -3539,7 +3545,7 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
+              <div className="rounded-2xl border border-white/10 glass-tile p-6 sm:p-8">
                 <h3 className="mt-2 text-xl font-semibold">
                   Evaluation parameters
                 </h3>
@@ -3695,7 +3701,7 @@ export default function Home() {
                     />
                   </div>
 
-                  <div className="rounded-xl border border-white/10 bg-surface/80 p-5">
+                  <div className="rounded-xl border border-white/10 glass-tile-sm p-5">
                     <h4 className="font-semibold">Evaluation configuration</h4>
                     <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-5">
                       {[
@@ -3716,7 +3722,7 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-white/10 bg-surface/80 p-6">
+                  <div className="rounded-2xl border border-white/10 glass-tile p-6">
                     <h4 className="text-lg font-semibold">
                       Generated evaluation samples
                     </h4>
