@@ -118,7 +118,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--ckpt", default="checkpoints/cond_ema.pt")
+    parser.add_argument("--ckpt", default=config.ckpt("cond_ema.pt"))
 
     parser.add_argument("--steps", type=int, default=50)
     parser.add_argument("--w", type=float, default=1.0)

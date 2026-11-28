@@ -14,16 +14,23 @@ BATCH_SIZE = 128
 T = 400  # number of timesteps
 BETA_START = 1e-4
 BETA_END = 0.02
-# Noise schedule: "linear" (BETA_START -> BETA_END, the original models) or
-# "cosine" (Nichol & Dhariwal 2021). Set it per run without editing this file:
-#   DIFFUSION_SCHEDULE=cosine python train.py --cond
-SCHEDULE = os.environ.get("DIFFUSION_SCHEDULE", "linear")
+# Noise schedule: "cosine" (Nichol & Dhariwal 2021, the default since it beat
+# linear in every paired run, README section 17) or "linear" (BETA_START ->
+# BETA_END, used for every result in README sections 1-16). Set per run:
+#   DIFFUSION_SCHEDULE=linear python guidance_seeds.py
+SCHEDULE = os.environ.get("DIFFUSION_SCHEDULE", "cosine")
 if SCHEDULE not in ("linear", "cosine"):
     raise ValueError(f"DIFFUSION_SCHEDULE must be 'linear' or 'cosine', got {SCHEDULE!r}")
 COSINE_S = 0.008
-# Checkpoints and result files of non-linear runs get a prefix, so the
-# original linear files (checkpoints/cond_ema.pt, ...) are never overwritten.
+# Each schedule has its own checkpoint files. The linear ones keep their
+# original names (checkpoints/cond_ema.pt, ema.pt); cosine ones get a prefix.
 CKPT_PREFIX = "" if SCHEDULE == "linear" else f"{SCHEDULE}_"
+
+
+def ckpt(name):
+    """Checkpoint path for the current schedule, e.g. ckpt("cond_ema.pt")."""
+    return f"checkpoints/{CKPT_PREFIX}{name}"
+
 
 # Model
 BASE_CH = 64  # 32 is enough on CPU

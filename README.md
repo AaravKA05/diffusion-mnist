@@ -124,7 +124,7 @@ Tested with Python 3.13 and PyTorch 2.15 (CPU build).
 
 **Image size:** `config.py` holds `IMG_SIZE` and `BASE_CH`. The final results use `IMG_SIZE = 32` and `BASE_CH = 64`. For a quick run on a laptop CPU, use `IMG_SIZE = 16` and `BASE_CH = 32`.
 
-**Local inference checkpoints:** `checkpoints/cond_ema.pt` (conditional diffusion model) and `checkpoints/classifier.pt` (evaluation classifier) are required by `server2.py` and by `export_onnx.py`. These two files are committed to Git, so a fresh clone can run the backend straight away.
+**Local inference checkpoints:** `checkpoints/cosine_cond_ema.pt` (conditional diffusion model, cosine schedule, used by default), `checkpoints/cond_ema.pt` (the original linear-schedule model) and `checkpoints/classifier.pt` (evaluation classifier) are used by `server2.py` and by `export_onnx.py`. These three files are committed to Git, so a fresh clone can run the backend straight away.
 
 To reproduce training from scratch, follow the training commands below; the 32x32 models took about 30 minutes each on a Colab T4.
 
@@ -161,12 +161,12 @@ Other local checkpoint files remain ignored by Git unless explicitly added.
 | `cd frontend && npm install && npm run dev` | Installs dependencies and starts the Next.js frontend |
 | `pytest -v tests/test_api.py` | Runs the automated backend API tests (the backend must be running) |
 | `python export_onnx.py` | Exports the U-Net and classifier to `frontend/public/models/` for browser mode and checks them against PyTorch |
-| `DIFFUSION_SCHEDULE=cosine python train.py --cond --epochs 30` | Train the conditional model with a cosine noise schedule; saves `checkpoints/cosine_cond_ema.pt` and leaves the linear files alone |
+| `DIFFUSION_SCHEDULE=linear python train.py --cond --epochs 30` | Train with the original linear noise schedule instead of cosine; saves `checkpoints/cond_ema.pt`. The same variable works for every script (sampling, evaluation, server, export) |
 | `python compare_schedules.py eval --schedule linear` (then `cosine`) | Label accuracy of one model at DDIM 10/20/50 steps, `w` 1.0 and 1.2, 3 seeds, same starting noise for both schedules |
 | `python compare_schedules.py report` | Table (`results/schedule_compare.md`) and plot comparing the two schedules |
 | `notebooks/cosine_schedule_colab.ipynb` | Colab notebook that trains the cosine model on a T4 and runs the whole comparison (about 40 min) |
 
-All settings (image size, `T`, learning rate, epochs, EMA decay) live in `config.py`. The noise schedule is linear by default (as for every model and result in this README); set the environment variable `DIFFUSION_SCHEDULE=cosine` (PowerShell: `$env:DIFFUSION_SCHEDULE="cosine"`) to use the cosine schedule from Nichol & Dhariwal (2021) instead. With the linear schedule, √ᾱ is still 0.13 at `t = 400`, so training never reaches pure noise; the cosine schedule does (ᾱ_T ≈ 1.5e-8). The 2D playground (section 16) is where this idea was first tested; on MNIST the cosine model was more accurate in every setting tried (section 17). The app and the browser mode still use the linear model.
+All settings (image size, `T`, learning rate, epochs, EMA decay) live in `config.py`. **Noise schedule:** the cosine schedule from Nichol & Dhariwal (2021) is the default, and the server and browser mode use the cosine model. It replaced the original linear schedule after it was more accurate in every setting tried (Results section 17). With the linear schedule, √ᾱ is still 0.13 at `t = 400`, so training never reaches pure noise; the cosine schedule does (ᾱ_T ≈ 1.5e-8). **Results sections 1 to 15 were made with the linear model.** To reproduce them, set `DIFFUSION_SCHEDULE=linear` before running a script (PowerShell: `$env:DIFFUSION_SCHEDULE="linear"`); each schedule loads its own checkpoint (`config.ckpt()`), so a script never mixes a model with the wrong schedule.
 
 ---
 
@@ -597,7 +597,8 @@ All 12 results, and 4 more with the digit left to the model, were read as 7 with
 | Check | Setting | Result |
 |---|---|---|
 | ONNX export against PyTorch | 3 inputs, `t` = 0, 150, 399 | Largest difference 1.9e-6 (U-Net), 3.3e-6 (bottleneck), 3.8e-6 (classifier) |
-| Full sampling, browser against PyTorch | 8 images of digit 7, 20 steps, `w = 1.2`, same starting noise | Largest pixel difference 8.4e-5; 7 of 8 read as 7 |
+| Full sampling, browser against PyTorch | 8 images of digit 7, 20 steps, `w = 1.2`, same starting noise | Linear model: largest pixel difference 8.4e-5; 7 of 8 read as 7 |
+| Same, cosine model (Node.js, `sampler.ts` with ONNX Runtime Web, seed 42) | as above | Largest pixel difference 1.6e-3 (1.6e-5 for the linear model in the same harness); 7 of 8 read as 7, same predictions as PyTorch |
 | All modules in browser mode | Every tab run once, no server | All ran without error |
 | Fallback | Server stopped during a session | Next request ran in the browser |
 | Speed, 2-core test machine | 8 images, 20 steps | PyTorch 2.4 s; browser 9.3 s (2 threads), 14.5 s (1 thread) |
@@ -689,6 +690,8 @@ Samples at DDIM 20, `w = 1.2`, seed 1, same noise per position (left: linear, ri
 - **Digit 1, the weakest class, gained 5.2 points** (86.6% → 91.8%), but it is still the weakest. The unconditional digit-1 question (section 9) needs an unconditional cosine model, which I have not trained yet (optional step 7 of the notebook).
 - **The pipeline reproduces earlier numbers exactly.** The linear model at DDIM 50 gave 87.9 / 87.1 / 89.1% at `w = 1.0` and 91.2 / 90.8 / 92.7% at `w = 1.2` for seeds 1 to 3: the same as `results/guidance_seeds_run1.json`, which was run on the laptop CPU.
 - **Same speed**: the schedule does not change the model, so sampling time is the same (159 s for all 18 linear runs, 165 s for cosine, on the T4).
+
+**Switched.** The server (`server2.py`) and browser mode now use the cosine model. Before switching I checked that the uploaded checkpoint reproduces the Colab run exactly on a CPU (DDIM 20, `w = 1.2`, seed 1: 96.9%, every per-digit number identical), re-exported it to ONNX (largest difference against PyTorch 1.9e-6) and ran all 14 API tests. Full browser sampling differs from PyTorch by up to 1.6e-3 per pixel, about 100 times more than for the linear model. The likely reason: at `t = 399` the cosine schedule keeps √ᾱ ≈ 1.2e-4 of the image, so the first DDIM step divides tiny ONNX-vs-PyTorch differences in ε by that number before the clip to [-1, 1]. Predictions were unchanged in the test above.
 
 **Limits.** One training run per schedule, so run-to-run training variance is not measured; the gap could be partly luck of that run, although it is consistent across all 18 settings. One classifier, so this is label accuracy, not image quality or FID. Loss values are not compared, because the two schedules weight the timesteps differently.
 
@@ -785,8 +788,9 @@ diffusion-mnist/
 │   └── scripts/copy-ort.mjs    # Copies ONNX Runtime Web files on npm install
 ├── static/                     # index2.html, the page served by server2.py at /
 ├── results/                    # Experimental figures and outputs
-├── checkpoints/                # Model checkpoints (only these two are in Git)
-│   ├── cond_ema.pt             # Conditional diffusion model
+├── checkpoints/                # Model checkpoints (only these three are in Git)
+│   ├── cosine_cond_ema.pt      # Conditional diffusion model, cosine schedule (default)
+│   ├── cond_ema.pt             # Conditional diffusion model, original linear schedule
 │   └── classifier.pt           # Evaluation classifier
 │
 ├── tests/

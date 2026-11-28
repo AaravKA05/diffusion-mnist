@@ -55,7 +55,7 @@ def evaluate(args):
     from sample_cond import cond_ddim_sample
 
     assert config.SCHEDULE == args.schedule
-    ckpt = args.ckpt or f"checkpoints/{config.CKPT_PREFIX}cond_ema.pt"
+    ckpt = args.ckpt or config.ckpt("cond_ema.pt")
     print(f"schedule {args.schedule}, checkpoint {ckpt}, device {device}", flush=True)
 
     model = UNet(num_classes=10).to(device)
@@ -125,7 +125,7 @@ def count_uncond(args):
     from evaluate import Classifier
     from model import UNet
 
-    ckpt = f"checkpoints/{config.CKPT_PREFIX}ema.pt"
+    ckpt = config.ckpt("ema.pt")
     model = UNet().to(device)
     model.load_state_dict(torch.load(ckpt, map_location=device))
     clf = Classifier().to(device)
