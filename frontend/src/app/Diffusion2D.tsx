@@ -427,7 +427,7 @@ export default function Diffusion2D() {
         <section className="space-y-6">
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
                 {/* Plot */}
-                <div className="rounded-2xl border border-white/10 bg-surface/70 p-6 sm:p-8">
+                <div className="rounded-2xl border border-white/10 glass-tile p-6 sm:p-8">
                     <div className="flex flex-wrap gap-x-6 gap-y-4">
                         <Segmented
                             label="Shape"
@@ -562,7 +562,7 @@ export default function Diffusion2D() {
 
                 {/* Schedules + recipe */}
                 <div className="space-y-6">
-                    <div className="rounded-2xl border border-white/10 bg-surface/70 p-6 sm:p-8">
+                    <div className="rounded-2xl border border-white/10 glass-tile p-6 sm:p-8">
                         <h3 className="text-xl font-semibold">Noise schedule</h3>
                         <p className="mt-2 text-sm leading-6 text-slate-400">
                             Four models per shape, same MLP and data. Scores are for the sampler picked on the left.
@@ -626,7 +626,7 @@ export default function Diffusion2D() {
                         )}
                     </div>
 
-                    <div className="rounded-2xl border border-white/10 bg-surface/70 p-6 sm:p-8">
+                    <div className="rounded-2xl border border-white/10 glass-tile p-6 sm:p-8">
                         <h3 className="text-xl font-semibold">The whole algorithm</h3>
                         <p className="mt-2 text-sm leading-6 text-slate-400">
                             Same lines as the MNIST model. Here ε_θ is an MLP (3 → 128 → 128 → 2) trained for{" "}
