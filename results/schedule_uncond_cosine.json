@@ -1,0 +1,7 @@
+{
+  "schedule": "cosine",
+  "checkpoint": "checkpoints/cosine_ema.pt",
+  "n": 500,
+  "steps": 50,
+  "class_counts": [67, 31, 55, 78, 31, 42, 43, 54, 42, 57]
+}
