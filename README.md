@@ -504,7 +504,7 @@ A stopwatch in the Gradio demo gave about 4.9 s for 20 steps and about 12 s for 
 
 `diagnose.py` (laptop CPU, about 15 to 18 minutes, 500 unconditional samples and 50 samples per label, DDIM 50 steps, seed 0) looks at the two open questions. These are observations from one run, not proven causes.
 
-**Digit 1 is rare in unconditional samples.** Only 14 of 500 samples (2.8%) were classified as 1 (earlier run: 32 of 1000). The classifier does not seem to be the cause: it is 99.74% accurate on real 1s, reads generated 1s with mean confidence 0.997, and no sample had p(1) > 0.2 while being assigned to another class. The conditional model can make 1s when asked (42 of 50 recognised at `w = 1.2`, the lowest per-digit accuracy). So the shortfall seems to come from the unconditional generator; I do not know why. Digits 0, 2 and 3 appeared most often and digits 1, 4 and 6 least often in both runs. The training set does not explain it either: digit 1 is the most frequent class in MNIST (6742 of 60,000 training images, versus 5421 to 6265 for the other digits).
+**Digit 1 is rare in unconditional samples.** (Update: with the cosine schedule this rose to 31 of 500, see section 17.) Only 14 of 500 samples (2.8%) were classified as 1 (earlier run: 32 of 1000). The classifier does not seem to be the cause: it is 99.74% accurate on real 1s, reads generated 1s with mean confidence 0.997, and no sample had p(1) > 0.2 while being assigned to another class. The conditional model can make 1s when asked (42 of 50 recognised at `w = 1.2`, the lowest per-digit accuracy). So the shortfall seems to come from the unconditional generator; I do not know why. Digits 0, 2 and 3 appeared most often and digits 1, 4 and 6 least often in both runs. The training set does not explain it either: digit 1 is the most frequent class in MNIST (6742 of 60,000 training images, versus 5421 to 6265 for the other digits).
 
 **`w = 3.0` is below chance.** 17 of 500 samples (3.4%) matched the requested label. No sample was classified as 1 for any label, and the most predicted classes were 2 (118) and 0 (92). The classifier stays fairly confident (mean 0.832) and pixels are not saturated, so the images are not simply blown out. Visually, the `w = 3.0` samples are distorted blobs and tangled strokes rather than recognisable digits (see the `w = 3.0` grid above). I did not find out why guidance this strong moves samples away from the requested digit.
 
@@ -686,7 +686,15 @@ Samples at DDIM 20, `w = 1.2`, seed 1, same noise per position (left: linear, ri
 - **Cosine was more accurate in all 18 paired runs** (3 step counts × 2 guidance strengths × 3 seeds), and on every digit. The best setting moved from 95.4% (linear, 10 steps, `w = 1.2`) to 97.0% (cosine, 20 steps, `w = 1.2`).
 - **The gap grows with more steps**: about +1 point at 10 steps, +3 at 20, +5 at 50. With linear, accuracy went *down* as steps went up (89.8% → 88.0% at `w = 1.0`); with cosine it went up or stayed flat. I do not know why the linear model gets worse with more DDIM steps.
 - **This is the opposite of the 2D result**, where cosine helped most at 10 steps. So the 2D playground pointed at the right change, but its step-count pattern did not carry over to images.
-- **Digit 1, the weakest class, gained 5.2 points** (86.6% → 91.8%), but it is still the weakest. The unconditional digit-1 question (section 9) needs an unconditional cosine model, which I have not trained yet (optional step 7 of the notebook).
+- **Digit 1, the weakest class, gained 5.2 points** (86.6% → 91.8%), but it is still the weakest.
+- **Unconditional model: more 1s, still too few.** I also trained an unconditional cosine model (notebook step 7, same settings, 30 epochs) and classified 500 samples (DDIM 50). Class counts, digits 0 to 9:
+
+  | Digits 0–9 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+  |---|---|---|---|---|---|---|---|---|---|---|
+  | Linear (`diagnose.py`, section 9) | 91 | **14** | 68 | 66 | 36 | 48 | 38 | 47 | 45 | 47 |
+  | Cosine | 67 | **31** | 55 | 78 | 31 | 42 | 43 | 54 | 42 | 57 |
+
+  Digit 1 went from 14 (2.8%) to 31 (6.2%), and the counts are more even (largest/smallest class 6.5× with linear, 2.5× with cosine). But 1 is still tied with 4 for the rarest class, while it is the most common digit in the training set (11.2%). So the schedule explains part of the shortfall, not all of it. One run per model, and the two runs did not use the same starting noise (`diagnose.py` and `compare_schedules.py uncond` draw it differently), so small differences between classes are not meaningful.
 - **The pipeline reproduces earlier numbers exactly.** The linear model at DDIM 50 gave 87.9 / 87.1 / 89.1% at `w = 1.0` and 91.2 / 90.8 / 92.7% at `w = 1.2` for seeds 1 to 3: the same as `results/guidance_seeds_run1.json`, which was run on the laptop CPU.
 - **Same speed**: the schedule does not change the model, so sampling time is the same (159 s for all 18 linear runs, 165 s for cosine, on the T4).
 
