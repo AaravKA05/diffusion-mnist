@@ -51,7 +51,8 @@ def overfit_test(steps=300):
 
 
 def train(epochs, cond=False):
-    prefix = "cond_" if cond else ""
+    prefix = config.CKPT_PREFIX + ("cond_" if cond else "")
+    print(f"schedule: {config.SCHEDULE}  ->  checkpoints/{prefix}ema.pt", flush=True)
     loader = get_loader()
     model = UNet(num_classes=10 if cond else 0).to(device)
     opt = torch.optim.Adam(model.parameters(), lr=config.LR)
@@ -76,7 +77,7 @@ def train(epochs, cond=False):
     plt.plot(history)
     plt.xlabel("epoch")
     plt.ylabel("loss")
-    plt.title("Training loss" + (" (conditional)" if cond else ""))
+    plt.title("Training loss" + (" (conditional)" if cond else "") + f", {config.SCHEDULE} schedule")
     plt.savefig(f"results/{prefix}loss_curve.png", bbox_inches="tight")
     plt.show()
 
