@@ -166,7 +166,7 @@ Other local checkpoint files remain ignored by Git unless explicitly added.
 | `python compare_schedules.py report` | Table (`results/schedule_compare.md`) and plot comparing the two schedules |
 | `notebooks/cosine_schedule_colab.ipynb` | Colab notebook that trains the cosine model on a T4 and runs the whole comparison (about 40 min) |
 
-All settings (image size, `T`, learning rate, epochs, EMA decay) live in `config.py`. The noise schedule is linear by default (as for every model and result in this README); set the environment variable `DIFFUSION_SCHEDULE=cosine` (PowerShell: `$env:DIFFUSION_SCHEDULE="cosine"`) to use the cosine schedule from Nichol & Dhariwal (2021) instead. With the linear schedule, √ᾱ is still 0.13 at `t = 400`, so training never reaches pure noise; the cosine schedule does (ᾱ_T ≈ 1.5e-8). The 2D playground (section 16) is where this idea was first tested.
+All settings (image size, `T`, learning rate, epochs, EMA decay) live in `config.py`. The noise schedule is linear by default (as for every model and result in this README); set the environment variable `DIFFUSION_SCHEDULE=cosine` (PowerShell: `$env:DIFFUSION_SCHEDULE="cosine"`) to use the cosine schedule from Nichol & Dhariwal (2021) instead. With the linear schedule, √ᾱ is still 0.13 at `t = 400`, so training never reaches pure noise; the cosine schedule does (ᾱ_T ≈ 1.5e-8). The 2D playground (section 16) is where this idea was first tested; on MNIST the cosine model was more accurate in every setting tried (section 17). The app and the browser mode still use the linear model.
 
 ---
 
@@ -651,6 +651,46 @@ The browser engine is about four times slower than PyTorch on the same CPU, so b
 - **DDIM samples are thinner than the data** (data → sample rises, e.g. 0.011 → 0.019 on the swiss roll with 10 calls): with no fresh noise, points pile up on the middle of each arm or mode.
 - **DDIM needs the x₀ clip with cosine.** At t = 100 the cosine schedule keeps √ᾱ ≈ 5e-4 of the signal, so the first x₀ estimate divides the error in ε by about 2,000. Without clipping x₀ to [-3, 3] the samples blew up (sample → data above 4 in a 300-step test run). All DDIM numbers above use the clip; DDPM does not.
 - **Browser check:** after a full DDIM run (all 12 models, 20 and 10 calls, same starting noise) the largest difference in a final point is 1.6e-3; the browser keeps the schedule in float64, PyTorch in float32.
+
+### 17. Linear vs Cosine Noise Schedule on MNIST
+
+The 2D playground suggested that the linear schedule is a weak point: on MNIST it still keeps √ᾱ = 0.13 of the image at `t = 400`. I trained the conditional model again with the cosine schedule (Nichol & Dhariwal 2021, `s = 0.008`, β capped at 0.999, ᾱ_T = 1.5e-8) and changed nothing else: same U-Net, 32x32, `T = 400`, 30 epochs, EMA 0.995. Training and evaluation ran on a Colab T4 with `notebooks/cosine_schedule_colab.ipynb`.
+
+Evaluation (`compare_schedules.py`): classifier label accuracy, 100 samples per digit per seed, DDIM 10, 20 and 50 steps, `w` 1.0 and 1.2, seeds 1 to 3. Every (seed, digit) starts from the same noise for both models, so each cell below is a paired comparison.
+
+| DDIM steps | `w` | Linear | Cosine | Cosine − linear, per seed (points) |
+|---|---|---|---|---|
+| 10 | 1.0 | 89.8% | 90.9% | +1.1, +0.1, +1.9 |
+| 10 | 1.2 | 95.4% | 96.2% | +0.5, +1.4, +0.7 |
+| 20 | 1.0 | 89.0% | 92.5% | +3.2, +4.2, +3.3 |
+| 20 | 1.2 | 94.1% | 97.0% | +2.3, +3.8, +2.6 |
+| 50 | 1.0 | 88.0% | 93.2% | +5.5, +5.1, +4.8 |
+| 50 | 1.2 | 91.6% | 96.1% | +4.8, +4.8, +4.1 |
+
+[![Linear vs cosine accuracy](results/schedule_compare.png)](results/schedule_compare.png)
+
+Per-digit accuracy, mean over all 18 settings above:
+
+| Digit | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Linear | 92.4 | 86.6 | 90.4 | 93.8 | 89.0 | 91.9 | 94.3 | 90.3 | 88.7 | 95.8 |
+| Cosine | 97.4 | 91.8 | 93.7 | 95.2 | 92.5 | 93.5 | 95.6 | 94.1 | 92.3 | 97.3 |
+
+Samples at DDIM 20, `w = 1.2`, seed 1, same noise per position (left: linear, right: cosine):
+
+<p>
+<img src="results/schedule_samples_linear.png" alt="Linear schedule samples" width="45%">
+<img src="results/schedule_samples_cosine.png" alt="Cosine schedule samples" width="45%">
+</p>
+
+- **Cosine was more accurate in all 18 paired runs** (3 step counts × 2 guidance strengths × 3 seeds), and on every digit. The best setting moved from 95.4% (linear, 10 steps, `w = 1.2`) to 97.0% (cosine, 20 steps, `w = 1.2`).
+- **The gap grows with more steps**: about +1 point at 10 steps, +3 at 20, +5 at 50. With linear, accuracy went *down* as steps went up (89.8% → 88.0% at `w = 1.0`); with cosine it went up or stayed flat. I do not know why the linear model gets worse with more DDIM steps.
+- **This is the opposite of the 2D result**, where cosine helped most at 10 steps. So the 2D playground pointed at the right change, but its step-count pattern did not carry over to images.
+- **Digit 1, the weakest class, gained 5.2 points** (86.6% → 91.8%), but it is still the weakest. The unconditional digit-1 question (section 9) needs an unconditional cosine model, which I have not trained yet (optional step 7 of the notebook).
+- **The pipeline reproduces earlier numbers exactly.** The linear model at DDIM 50 gave 87.9 / 87.1 / 89.1% at `w = 1.0` and 91.2 / 90.8 / 92.7% at `w = 1.2` for seeds 1 to 3: the same as `results/guidance_seeds_run1.json`, which was run on the laptop CPU.
+- **Same speed**: the schedule does not change the model, so sampling time is the same (159 s for all 18 linear runs, 165 s for cosine, on the T4).
+
+**Limits.** One training run per schedule, so run-to-run training variance is not measured; the gap could be partly luck of that run, although it is consistent across all 18 settings. One classifier, so this is label accuracy, not image quality or FID. Loss values are not compared, because the two schedules weight the timesteps differently.
 
 ### Side Note: Earlier 16x16 Runs on Laptop CPU
 
