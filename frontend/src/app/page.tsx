@@ -506,7 +506,7 @@ export default function Home() {
   const [representationLoading, setRepresentationLoading] = useState(false);
   const [representationError, setRepresentationError] = useState("");
   const [selectedChannel, setSelectedChannel] = useState(0);
-  const [evolutionTimesteps, setEvolutionTimesteps] = useState([350, 250, 150, 50]);
+  const [evolutionTimesteps] = useState([350, 250, 150, 50]);
   const [evolutionData, setEvolutionData] = useState<any>(null);
   const [evolutionLoading, setEvolutionLoading] = useState(false);
   const [evolutionError, setEvolutionError] = useState("");
