@@ -56,7 +56,7 @@ const SAMPLERS: { id: SamplerKey; label: string; steps: number }[] = [
 const SCHEDULE_INFO: Record<string, { formula: string; note: string }> = {
     gentle: {
         formula: "linear, β_T = 0.02",
-        note: "Never reaches pure noise: 60% of the signal is left at t = 100. Same β range as the MNIST model, which keeps 13% at t = 400.",
+        note: "Never reaches pure noise: 60% of the signal is left at t = 100. Same β range as the original MNIST model, which kept 13% at t = 400; the site now uses a cosine model.",
     },
     linear: { formula: "linear, β_T = 0.2", note: "Signal reaches about zero right at the last step." },
     aggressive: {

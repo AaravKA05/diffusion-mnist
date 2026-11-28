@@ -51,7 +51,7 @@ if __name__ == "__main__":
 
     torch.manual_seed(args.seed)
     model = UNet(num_classes=10).to(device)
-    model.load_state_dict(torch.load("checkpoints/cond_ema.pt", map_location=device))
+    model.load_state_dict(torch.load(config.ckpt("cond_ema.pt"), map_location=device))
 
     labels = torch.arange(10, device=device).repeat(2)  # two rows of 0..9
     frames = trajectory(model, labels, args.steps, args.w, args.scale)
