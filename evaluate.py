@@ -58,7 +58,7 @@ if __name__ == "__main__":
 
     # 1) unconditional model: confidence + class balance
     model = UNet().to(device)
-    model.load_state_dict(torch.load("checkpoints/ema.pt", map_location=device))
+    model.load_state_dict(torch.load(config.ckpt("ema.pt"), map_location=device))
     imgs = ddim_sample(model, n=1000, steps=50)
     with torch.no_grad():
         probs = F.softmax(clf(imgs), dim=1)
@@ -73,10 +73,10 @@ if __name__ == "__main__":
     )
 
     # 2) conditional model: does the label give the right digit?
-    if os.path.exists("checkpoints/cond_ema.pt"):
+    if os.path.exists(config.ckpt("cond_ema.pt")):
         cmodel = UNet(num_classes=10).to(device)
         cmodel.load_state_dict(
-            torch.load("checkpoints/cond_ema.pt", map_location=device)
+            torch.load(config.ckpt("cond_ema.pt"), map_location=device)
         )
         labels = torch.arange(10, device=device).repeat_interleave(100)
         for w in (0.0, 1.0, 1.5, 2.0, 3.0):

@@ -13,6 +13,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROBE = """
 import json, torch, config, diffusion as d
 print(json.dumps({
+    "ckpt": config.ckpt("cond_ema.pt"),
     "schedule": config.SCHEDULE,
     "prefix": config.CKPT_PREFIX,
     "betas": d.betas.cpu().tolist(),
@@ -31,9 +32,14 @@ def probe(schedule=None):
     return r
 
 
-def test_default_is_the_original_linear_schedule():
-    import torch
+def test_default_is_cosine():
     out = json.loads(probe().stdout)
+    assert out["schedule"] == "cosine" and out["prefix"] == "cosine_"
+
+
+def test_linear_is_the_original_schedule():
+    import torch
+    out = json.loads(probe("linear").stdout)
     assert out["schedule"] == "linear" and out["prefix"] == ""
     expected = torch.linspace(1e-4, 0.02, 400).tolist()
     assert out["betas"] == expected                 # bit-for-bit unchanged
@@ -43,6 +49,7 @@ def test_default_is_the_original_linear_schedule():
 def test_cosine_schedule():
     out = json.loads(probe("cosine").stdout)
     assert out["prefix"] == "cosine_"
+    assert out["ckpt"] == "checkpoints/cosine_cond_ema.pt"
     assert len(out["betas"]) == 400
     assert max(out["betas"]) <= 0.999 + 1e-6
     assert min(out["betas"]) > 0

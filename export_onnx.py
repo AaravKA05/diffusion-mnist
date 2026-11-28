@@ -4,7 +4,9 @@ Run once on the laptop (inside the venv), from the project folder:
 
     python export_onnx.py
 
-It reads   checkpoints/cond_ema.pt     (conditional U-Net, EMA weights)
+It reads   checkpoints/cosine_cond_ema.pt  (conditional U-Net, EMA weights;
+                                       checkpoints/cond_ema.pt with
+                                       DIFFUSION_SCHEDULE=linear)
            checkpoints/classifier.pt   (CNN digit classifier)
 and writes frontend/public/models/unet.onnx
            frontend/public/models/classifier.onnx
@@ -85,7 +87,7 @@ def check(path, feeds, expected, name):
             raise SystemExit(f"Export check FAILED for {name} ({label.name}).")
 
 
-def main(unet_path="checkpoints/cond_ema.pt", clf_path="checkpoints/classifier.pt"):
+def main(unet_path=config.ckpt("cond_ema.pt"), clf_path="checkpoints/classifier.pt"):
     os.makedirs(OUT_DIR, exist_ok=True)
     torch.manual_seed(0)
 
@@ -119,6 +121,7 @@ def main(unet_path="checkpoints/cond_ema.pt", clf_path="checkpoints/classifier.p
         "T": config.T,
         "img_size": config.IMG_SIZE,
         "num_classes": 10,
+        "noise_schedule": config.SCHEDULE,
         "alpha_bar": [float(v) for v in alpha_bar.cpu()],
     }
     with open(os.path.join(OUT_DIR, "schedule.json"), "w") as f:

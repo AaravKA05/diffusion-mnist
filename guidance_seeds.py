@@ -8,6 +8,7 @@ import time
 
 import torch
 
+import config
 from diffusion import device
 from evaluate import Classifier
 from model import UNet
@@ -21,7 +22,7 @@ ap.add_argument("--steps", type=int, default=50)
 args = ap.parse_args()
 
 model = UNet(num_classes=10).to(device)
-model.load_state_dict(torch.load("checkpoints/cond_ema.pt", map_location=device))
+model.load_state_dict(torch.load(config.ckpt("cond_ema.pt"), map_location=device))
 model.eval()
 clf = Classifier().to(device)
 clf.load_state_dict(torch.load("checkpoints/classifier.pt", map_location=device))

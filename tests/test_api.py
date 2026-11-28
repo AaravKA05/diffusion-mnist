@@ -28,6 +28,7 @@ def test_api_info(client):
     data = response.json()
     assert data["status"] == "online"
     assert data["classes"] == 10
+    assert data["noise_schedule"] in ("linear", "cosine")
 
 
 def test_generate(client):

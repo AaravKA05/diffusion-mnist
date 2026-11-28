@@ -61,7 +61,7 @@ def main():
     # ---- Part 2: unconditional samples ----
     print("\n=== Part 2: unconditional samples (EMA, DDIM) ===")
     model_u = UNet().to(device)
-    model_u.load_state_dict(torch.load("checkpoints/ema.pt", map_location=device))
+    model_u.load_state_dict(torch.load(config.ckpt("ema.pt"), map_location=device))
     model_u.eval()
 
     ps, inks = [], []
@@ -100,7 +100,7 @@ def main():
 
     # ---- Part 3: conditional model, per label and confusion matrix ----
     model_c = UNet(num_classes=10).to(device)
-    model_c.load_state_dict(torch.load("checkpoints/cond_ema.pt", map_location=device))
+    model_c.load_state_dict(torch.load(config.ckpt("cond_ema.pt"), map_location=device))
     model_c.eval()
 
     out["conditional"] = {}

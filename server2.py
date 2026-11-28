@@ -43,10 +43,11 @@ BASE = Path(__file__).parent
 model = UNet(num_classes=10).to(device)
 
 model.load_state_dict(
-    torch.load(BASE / "checkpoints" / "cond_ema.pt", map_location=device)
+    torch.load(BASE / config.ckpt("cond_ema.pt"), map_location=device)
 )
 
 model.eval()
+print(f"Loaded {config.ckpt('cond_ema.pt')} ({config.SCHEDULE} noise schedule)", flush=True)
 
 clf = Classifier().to(device)
 
@@ -250,6 +251,7 @@ def info():
         "status": "online",
         "model": "Class-Conditional MNIST Diffusion",
         "img_size": config.IMG_SIZE,
+        "noise_schedule": config.SCHEDULE,
         "device": str(device),
         "classes": 10,
         "evaluation_available": True,
