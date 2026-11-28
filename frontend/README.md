@@ -1,36 +1,22 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DiffusionLab frontend
 
-## Getting Started
-
-First, run the development server:
+Next.js app for [DiffusionLab](../README.md). It talks to the FastAPI backend (`server2.py`) when that is running, and otherwise runs the model in the browser with ONNX Runtime Web.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install      # also copies ONNX Runtime Web files to public/ort (scripts/copy-ort.mjs)
+npm run dev      # http://localhost:3000
+npm run build    # production build
+npm run lint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| Path | What it holds |
+|---|---|
+| `src/app/page.tsx` | Main page: sidebar, Studio and most tabs |
+| `src/app/RecognitionTimeline.tsx`, `SketchToDigit.tsx`, `Diffusion2D.tsx` | Recognition timeline, Sketch to digit and 2D playground tabs |
+| `src/app/LaunchScreen.tsx`, `LiveDenoise.tsx` | Launch page and its live denoising demo |
+| `src/app/globals.css` | Theme colours and the glass tile styles |
+| `src/lib/engine/` | Browser engine: ONNX Runtime Web, DDIM sampler, local API |
+| `public/models/` | `unet.onnx`, `classifier.onnx`, `schedule.json` (made by `export_onnx.py`) and `toy2d/` (made by `toy2d.py`) |
+| `public/media/` | Background video on the launch page |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The backend URL and setup are described in the main README.

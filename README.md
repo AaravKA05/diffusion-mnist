@@ -150,8 +150,6 @@ Other local checkpoint files remain ignored by Git unless explicitly added.
 | `python make_gif.py` | Denoising GIF (two rows of digits 0 to 9) |
 | `python check_clf.py` | Test accuracy of the saved classifier on real MNIST (98.52% at 32x32, see Results section 7) |
 | `python diagnose.py` | Per-digit diagnosis of unconditional and guided samples (about 15 to 18 min on a laptop CPU) |
-| `python app.py` | Gradio live demo (local only) |
-| `python app.py --share` | Same demo with a temporary `gradio.live` link, only while the app is running |
 | `python vae.py --epochs 10` | Small VAE baseline, scored by the same classifier (about 40 s per epoch on a laptop CPU) |
 | `python guidance_seeds.py` | Repeat the `w = 1.0` against `w = 1.2` comparison over 3 seeds (about 1 hour on a laptop CPU) |
 | `python plot_diagnose.py` | Figures from `results/diagnose.json` (counts, per-digit accuracy, confusion matrices) |
@@ -498,7 +496,7 @@ Measured on the laptop CPU, approximate: the "Done in" time reported by the Fast
 | 1.2 | 4.6 s |
 | 2 | 4.32 s |
 
-A stopwatch in the Gradio demo gave about 4.9 s for 20 steps and about 12 s for 50 steps (the number of images in that run was not recorded). In a later session the second web demo showed 2.07 s for Generate and 6.08 s for Compare (three sets of 8); I did not investigate why the times differ between sessions. For `w` other than 1.0 the model runs twice per step (conditional and unconditional), so `w` barely changes the time.
+A stopwatch in an earlier local Gradio demo (not part of this repository) gave about 4.9 s for 20 steps and about 12 s for 50 steps (the number of images in that run was not recorded). In a later session the second web demo showed 2.07 s for Generate and 6.08 s for Compare (three sets of 8); I did not investigate why the times differ between sessions. For `w` other than 1.0 the model runs twice per step (conditional and unconditional), so `w` barely changes the time.
 
 ### 9. Diagnosis of Two Open Questions (`diagnose.py`)
 
@@ -773,7 +771,6 @@ diffusion-mnist/
 ├── evaluate.py                # Classifier-based evaluation
 ├── sweep_w.py                 # Classifier-free guidance sweep
 ├── make_gif.py                # Denoising process GIF generation
-├── app.py                     # Gradio demo
 │
 ├── server2.py                 # Current FastAPI backend
 ├── lab_features.py            # Recognition timeline and sketch to digit
@@ -797,7 +794,6 @@ diffusion-mnist/
 │   ├── src/lib/engine/         # Browser engine: ONNX Runtime Web, DDIM, endpoints
 │   ├── public/models/          # unet.onnx, classifier.onnx, schedule.json
 │   └── scripts/copy-ort.mjs    # Copies ONNX Runtime Web files on npm install
-├── static/                     # index2.html, the page served by server2.py at /
 ├── results/                    # Experimental figures and outputs
 ├── checkpoints/                # Model checkpoints (only these three are in Git)
 │   ├── cosine_cond_ema.pt      # Conditional diffusion model, cosine schedule (default)

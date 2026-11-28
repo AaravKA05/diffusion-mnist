@@ -4,7 +4,6 @@ import argparse
 
 import matplotlib.pyplot as plt
 import torch
-from torchgen import model
 from torchvision.utils import make_grid
 
 import config

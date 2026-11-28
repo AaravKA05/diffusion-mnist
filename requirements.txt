@@ -24,3 +24,10 @@ typing_extensions==4.16.0
 tzdata==2026.6
 fastapi==0.162.5
 uvicorn==0.54.0
+# Browser-mode export (export_onnx.py)
+onnx==1.23.2
+onnxruntime==1.29.0
+onnxscript==0.7.2
+# Tests
+pytest==9.1.1
+httpx==0.29.0
