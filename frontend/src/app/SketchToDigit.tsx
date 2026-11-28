@@ -167,7 +167,7 @@ export default function SketchToDigit({
             </div>
 
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-                <div className="rounded-2xl border border-white/10 bg-surface/80 p-6 sm:p-8">
+                <div className="rounded-2xl border border-white/10 glass-tile p-6 sm:p-8">
                     <h3 className="mt-2 text-xl font-semibold">Your sketch</h3>
 
                     <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:items-start">
@@ -352,7 +352,7 @@ export default function SketchToDigit({
                     )}
                 </div>
 
-                <div className="flex min-h-120 flex-col rounded-2xl border border-white/10 bg-surface/70 p-6 sm:p-8">
+                <div className="flex min-h-120 flex-col rounded-2xl border border-white/10 glass-tile p-6 sm:p-8">
                     <h3 className="mt-2 text-xl font-semibold">From sketch to digit</h3>
 
                     {loading ? (
