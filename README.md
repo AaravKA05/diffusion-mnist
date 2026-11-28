@@ -161,8 +161,12 @@ Other local checkpoint files remain ignored by Git unless explicitly added.
 | `cd frontend && npm install && npm run dev` | Installs dependencies and starts the Next.js frontend |
 | `pytest -v tests/test_api.py` | Runs the automated backend API tests (the backend must be running) |
 | `python export_onnx.py` | Exports the U-Net and classifier to `frontend/public/models/` for browser mode and checks them against PyTorch |
+| `DIFFUSION_SCHEDULE=cosine python train.py --cond --epochs 30` | Train the conditional model with a cosine noise schedule; saves `checkpoints/cosine_cond_ema.pt` and leaves the linear files alone |
+| `python compare_schedules.py eval --schedule linear` (then `cosine`) | Label accuracy of one model at DDIM 10/20/50 steps, `w` 1.0 and 1.2, 3 seeds, same starting noise for both schedules |
+| `python compare_schedules.py report` | Table (`results/schedule_compare.md`) and plot comparing the two schedules |
+| `notebooks/cosine_schedule_colab.ipynb` | Colab notebook that trains the cosine model on a T4 and runs the whole comparison (about 40 min) |
 
-All settings (image size, `T`, learning rate, epochs, EMA decay) live in `config.py`.
+All settings (image size, `T`, learning rate, epochs, EMA decay) live in `config.py`. The noise schedule is linear by default (as for every model and result in this README); set the environment variable `DIFFUSION_SCHEDULE=cosine` (PowerShell: `$env:DIFFUSION_SCHEDULE="cosine"`) to use the cosine schedule from Nichol & Dhariwal (2021) instead. With the linear schedule, √ᾱ is still 0.13 at `t = 400`, so training never reaches pure noise; the cosine schedule does (ᾱ_T ≈ 1.5e-8). The 2D playground (section 16) is where this idea was first tested.
 
 ---
 
@@ -730,6 +734,9 @@ diffusion-mnist/
 ├── guidance_seeds.py          # Guidance comparison across seeds
 ├── nn_check.py                # Nearest-neighbour copy check
 ├── preflight.py               # Pre-demo environment checks
+├── compare_schedules.py       # Linear vs cosine schedule on the conditional model
+├── notebooks/
+│   └── cosine_schedule_colab.ipynb  # Train the cosine model and compare, on Colab
 │
 ├── frontend/                   # Next.js, React and TypeScript frontend
 │   ├── src/app/                # Pages and components (page.tsx, RecognitionTimeline, SketchToDigit, ...)
@@ -743,7 +750,9 @@ diffusion-mnist/
 │   └── classifier.pt           # Evaluation classifier
 │
 ├── tests/
-│   └── test_api.py             # Automated backend API tests
+│   ├── test_api.py             # Automated backend API tests
+│   ├── test_toy2d.py           # 2D playground script
+│   └── test_schedule.py        # Linear and cosine schedule option
 │
 ├── requirements.txt            # Python dependencies
 └── README.md

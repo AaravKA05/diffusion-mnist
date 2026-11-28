@@ -1,4 +1,6 @@
 """Step 2 and 6: noise schedule, q_sample (forward process), sampling."""
+import math
+
 import torch
 
 import config
@@ -6,7 +8,23 @@ import config
 T = config.T
 device = config.DEVICE
 
-betas = torch.linspace(config.BETA_START, config.BETA_END, T).to(device)
+
+def make_betas(schedule=config.SCHEDULE, T=T):
+    """Per-step noise variances beta_t for t = 0 .. T-1."""
+    if schedule == "linear":
+        return torch.linspace(config.BETA_START, config.BETA_END, T)
+    if schedule == "cosine":
+        # alpha_bar(t) = cos^2(((t/T + s) / (1 + s)) * pi/2), betas capped at
+        # 0.999 so the last step does not divide by zero.
+        s = config.COSINE_S
+        steps = torch.arange(T + 1, dtype=torch.float64) / T
+        f = torch.cos((steps + s) / (1 + s) * math.pi / 2) ** 2
+        ab = f / f[0]
+        return (1 - ab[1:] / ab[:-1]).clamp(max=0.999).float()
+    raise ValueError(f"unknown schedule {schedule!r}")
+
+
+betas = make_betas().to(device)
 alphas = 1.0 - betas
 alpha_bar = torch.cumprod(alphas, dim=0)
 sqrt_ab = torch.sqrt(alpha_bar)
@@ -72,6 +90,7 @@ if __name__ == "__main__":
     x0 = x[:1].to(device)              # one digit
     noise = torch.randn_like(x0)       # same noise for every t
 
+    print("schedule      :", config.SCHEDULE)
     print("alpha_bar[0]  :", alpha_bar[0].item())
     print("alpha_bar[-1] :", alpha_bar[-1].item())
 
