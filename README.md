@@ -13,7 +13,7 @@ DiffusionLab demonstrates how a neural network learns to reverse a gradual noise
 ## Project Highlights
 
 - Custom U-Net architecture with sinusoidal timestep embeddings.
-- 400-step linear noise schedule.
+- 400-step cosine noise schedule, which replaced the original linear one after beating it in all 18 paired runs (Results section 17).
 - DDPM and DDIM sampling.
 - Class-conditional generation with classifier-free guidance.
 - Exponential Moving Average (EMA) of model weights.
@@ -52,7 +52,7 @@ DiffusionLab demonstrates how a neural network learns to reverse a gradual noise
 | Testing | Pytest, HTTPX |
 | Deployment | Vercel (site and browser mode); optional laptop backend through a Cloudflare Quick Tunnel |
 
-**Model configuration:** 32 × 32 image resolution, 400 diffusion timesteps, and a class-conditional U-Net trained on MNIST using a Colab T4 GPU.
+**Model configuration:** 32 × 32 image resolution, 400 diffusion timesteps with a cosine noise schedule, and a class-conditional U-Net trained on MNIST using a Colab T4 GPU.
 
 ---
 
@@ -75,7 +75,7 @@ DiffusionLab demonstrates how a neural network learns to reverse a gradual noise
 
 ## How Diffusion Works
 
-A diffusion model learns to generate images by reversing the process of adding noise. During training, Gaussian noise is gradually added to real images over 400 steps until they become almost pure noise. A mathematical formula allows us to directly generate any noise level, making training more efficient.
+A diffusion model learns to generate images by reversing the process of adding noise. During training, Gaussian noise is gradually added to real images over 400 steps until they become pure noise. How fast the noise grows is set by the *noise schedule*: this project now uses a cosine schedule, which reaches pure noise at step 400; the original linear schedule still left about 13% of the image there (Results section 17). A mathematical formula allows us to directly generate any noise level, making training more efficient.
 
 A U-Net is trained to predict and remove this noise, using timestep embeddings to understand each stage. During generation, the model starts with random noise and progressively removes it, transforming static into a completely new image.
 
@@ -322,9 +322,7 @@ The backend loads the trained conditional diffusion model and evaluation classif
 
 The backend API is tested using **Pytest** and **HTTPX**.
 
-The test suite is located in:
-
-`tests/test_api.py`
+The API test suite is located in `tests/test_api.py`. Two smaller suites need no server: `tests/test_schedule.py` (linear and cosine schedule option, checkpoint names) and `tests/test_toy2d.py` (2D playground script).
 
 ### Test Coverage
 
@@ -352,8 +350,9 @@ pytest -v tests/test_api.py
 ### Test Results
 
 - **Total tests:** 14
-- **Passed:** 14 (local backend with the trained model, 26 November 2026)
+- **Passed:** 14 (local backend with the trained model, 26 November 2026; again with the cosine model on a 2-core test machine, 28 November 2026)
 - **Failed:** 0
+- `tests/test_schedule.py` and `tests/test_toy2d.py`: 11 of 11 passed (28 November 2026)
 
 The first ten tests passed in 8.62 s; the four newer ones cover the recognition and sketch endpoints. The tests send HTTP requests to a running FastAPI server, so start the backend first (otherwise every test fails with `ConnectError`). The browser engine and the frontend are not covered by these tests; they were checked by hand and with scripted browser runs (Results section 15).
 
@@ -361,7 +360,7 @@ The first ten tests passed in 8.62 s; the four newer ones cover the recognition 
 
 ## Results
 
-All numbers below are for **32x32 images, `BASE_CH = 64`, 30 epochs, trained on a Colab T4**, unless stated otherwise.
+All numbers below are for **32x32 images, `BASE_CH = 64`, 30 epochs, trained on a Colab T4**, unless stated otherwise. **Sections 1 to 15 use the original linear-schedule model.** Section 17 compares it with the cosine-schedule model, which the site now uses; set `DIFFUSION_SCHEDULE=linear` to reproduce the earlier sections.
 
 ### 1. Data and Forward Process
 
@@ -712,7 +711,8 @@ Before moving to Colab I trained 16x16 models (`BASE_CH = 32`) on a laptop CPU.
 - Not a production service. The PyTorch backend runs on a laptop CPU behind a temporary tunnel; when it is off, the site runs the model in the visitor's browser, which is slower on weak devices and was not measured on phones.
 - No claim that diffusion beats VAEs or GANs in general; the VAE here is small and untuned.
 - No significance claim for the guidance gain (3 seeds, one classifier).
-- No explanation for the rare digit 1 or for the failure at `w = 3.0`; both are open questions (the recognition timeline only shows when the `w = 3.0` failure happens).
+- No full explanation for the rare digit 1: the cosine schedule raised it from 14 to 31 of 500 unconditional samples, but 1 is still among the rarest classes. The failure at `w = 3.0` is also unexplained (the recognition timeline only shows when it happens).
+- One training run per noise schedule, so the cosine gain (section 17) does not include run-to-run training variance.
 - The recognition timeline and sketch results use one digit and a few seeds or sketches.
 - The public API has no login or rate limit.
 
@@ -741,6 +741,9 @@ Before moving to Colab I trained 16x16 models (`BASE_CH = 32`) on a laptop CPU.
 | Browser engine returned empty images | ONNX Runtime Web in a Web Worker takes ownership of input buffers, so arrays passed to the classifier were left "detached" | Pass a copy of the array to the model |
 | All API tests failed with `ConnectError` | The backend was not running when `pytest` started | Start `uvicorn server2:app` first, then run the tests in a second terminal |
 | Commit landed on `main` | The feature branch was not created before committing, so `git push` said the branch did not exist | Create the branch afterwards (`git checkout -b ...`); the commit moves with it |
+| 2D model looked blurry | With 8,000 training steps (as in the slide I started from) the linear 2D model gave a fuzzy swiss roll | 30,000 steps fixed it (0.059 → 0.027); check the samples, not only the loss |
+| DDIM blew up with the cosine schedule | In the 2D playground, DDIM samples with cosine landed far off the shape: at `t = T` cosine keeps only √ᾱ ≈ 5e-4 of the signal, so the first clean-image guess multiplies any error by about 2,000 | Clip the clean-image guess, as the MNIST sampler already did (to [-1, 1]); the 2D sampler clips to [-3, 3] |
+| Command run in the wrong folder | `cd ..` from the project root moved to `Downloads`, so `git` said "not a git repository" | Run `git status` first; the prompt path shows where you are |
 | Gradio share link failed | The tunnel client download was blocked by the antivirus (found only because `Get-FileHash` reported a virus warning) | Add a folder exception for that one folder, check the hash against Gradio's checksum, remove it later |
 
 ---
