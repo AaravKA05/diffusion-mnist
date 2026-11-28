@@ -23,7 +23,7 @@ DiffusionLab demonstrates how a neural network learns to reverse a gradual noise
 - **Recognition timeline:** classifies the model's clean-image guess at every sampling step to show *when* a digit becomes readable.
 - **Sketch to digit:** SDEdit-style clean-up of a hand-drawn digit, with no retraining.
 - VAE baseline, nearest-neighbour copy check, and per-digit diagnosis.
-- **2D playground:** the same DDPM recipe on a 2-D swiss roll with a tiny MLP, so every reverse step and the effect of the noise schedule can be seen.
+- **2D playground:** the same DDPM recipe on 2-D point clouds (swiss roll, two moons, 8 Gaussians) with a tiny MLP, so every reverse step, the noise schedule and DDIM's skipped steps can be seen.
 
 ## DiffusionLab Features
 
@@ -36,7 +36,7 @@ DiffusionLab demonstrates how a neural network learns to reverse a gradual noise
 - **Feature Evolution:** Observe how selected feature channels change across diffusion timesteps.
 - **Recognition Timeline:** See at which sampling step the classifier starts reading the requested digit, for up to four guidance scales.
 - **Sketch to Digit:** Draw a digit with the mouse, a finger or a pen and let the model clean it up.
-- **2D Playground:** Watch 2,000 points go from noise to a swiss roll, scrub any timestep, and compare three noise schedules.
+- **2D Playground:** Watch 2,000 points go from noise to a shape, scrub any timestep, compare four noise schedules, and sample with DDPM (100 steps) or DDIM (20 or 10).
 - **Works without a server:** a progress bar shows each step while the model runs in the browser; any generated image can be clicked to view it large.
 
 ## Technology Stack
@@ -249,8 +249,10 @@ The Representation Explorer visualizes internal U-Net activations. It is not a V
 
 - The full algorithm on 2-D points instead of images: 100 steps, an MLP (`3 → 128 → 128 → 2`, input `x, y, t/T`) in place of the U-Net.
 - Scrub the timestep slider in either direction, or play the forward (noising) or reverse (denoising) process.
-- Switch between three trained schedules (gentle, linear, aggressive) and see how much signal each keeps at every step.
-- The MLP runs in plain TypeScript on the page (no server, no ONNX runtime); the weights are a 290 KB JSON file written by `toy2d.py`.
+- Three shapes: swiss roll, two moons, and 8 Gaussians (a mode-coverage test, like the 10 MNIST digits).
+- Four trained schedules per shape (gentle, linear, aggressive, cosine) with a plot of how much signal each keeps at every step.
+- Three samplers: DDPM with all 100 steps, or deterministic DDIM with 20 or 10 model calls from the same starting noise.
+- The MLP runs in plain TypeScript on the page (no server, no ONNX runtime). Each shape's 4 models are one 390 KB JSON file written by `toy2d.py`, loaded when the shape is first picked.
 
 ---
 
@@ -600,27 +602,51 @@ All 12 results, and 4 more with the digit left to the model, were read as 7 with
 
 The browser engine is about four times slower than PyTorch on the same CPU, so browser mode starts with lighter defaults (4 images, 20 steps). Phones were not measured. The first visit downloads about 25 MB (model and runtime).
 
-### 16. 2D Swiss Roll: Noise Schedules
+### 16. 2D Playground: Schedules, Shapes and DDIM
 
-`python toy2d.py`: 2,000 swiss-roll points, `T = 100`, linear β from 1e-4 to β_T, MLP `3 → 128 → 128 → 2`, Adam 1e-3 with cosine decay, 30,000 full-batch steps (about 70 s per schedule on a 2-core CPU). Sampling: 2,000 points, DDPM, seed 1.
+`python toy2d.py`: 2,000 points per shape, `T = 100`, MLP `3 → 128 → 128 → 2`, Adam 1e-3 with cosine decay, 30,000 full-batch steps (about 70 s per model, 12 models, on a 2-core CPU). Linear schedules start at β₁ = 1e-4 and differ only in β_T; cosine follows Nichol & Dhariwal (2021) with `s = 0.008` and β capped at 0.999. Sampling: 2,000 points, seed 1; DDIM uses the same starting noise as DDPM.
 
 [![Reverse diffusion in 2D](results/toy2d_reverse.png)](results/toy2d_reverse.png)
 
 [![Noise schedules in 2D](results/toy2d_schedules.png)](results/toy2d_schedules.png)
 
-| Schedule | β_T | ᾱ_T | Sample → data | Data → sample |
+**Metrics.** *Sample → data* is the mean distance from each generated point to its nearest training point (lower: samples sit on the shape). *Data → sample* is the reverse (lower: the whole shape is covered). For 8 Gaussians, a mode counts as covered if at least 2% of samples land within 3σ of its centre. The last row of each table is a second real draw of 2,000 points, the best a model can score. Full numbers in `results/toy2d_metrics.json`.
+
+**Schedules, DDPM 100 steps (sample → data / data → sample):**
+
+| Schedule | ᾱ_T | Swiss roll | Two moons | 8 Gaussians |
 |---|---|---|---|---|
-| Gentle | 0.02 | 0.36 | 0.013 | 0.011 |
-| Linear | 0.2 | 2.1e-5 | 0.027 | 0.013 |
-| Aggressive | 0.5 | 4.5e-14 | 0.043 | 0.015 |
-| Real data vs a second real draw | | | 0.011 | 0.011 |
+| Gentle (linear, β_T = 0.02) | 0.36 | 0.014 / 0.011 | 0.018 / 0.017 | 0.017 / 0.015 |
+| Linear (β_T = 0.2) | 2.1e-5 | 0.027 / 0.013 | 0.025 / 0.016 | 0.026 / 0.015 |
+| Aggressive (linear, β_T = 0.5) | 4.5e-14 | 0.042 / 0.015 | 0.035 / 0.017 | 0.032 / 0.015 |
+| Cosine (s = 0.008) | 2.4e-7 | 0.015 / 0.011 | 0.019 / 0.017 | 0.019 / 0.014 |
+| Real vs real | | 0.011 / 0.011 | 0.016 / 0.016 | 0.015 / 0.015 |
 
-*Sample → data* is the mean distance from each generated point to its nearest training point (lower means samples sit on the roll); *data → sample* is the reverse (lower means the whole roll is covered). Full numbers in `results/toy2d_metrics.json`.
+[![Shapes, linear vs cosine](results/toy2d_shapes.png)](results/toy2d_shapes.png)
 
-- **Aggressive is the blurriest.** Its signal is gone by about step 50, so only the first half of the steps carry information about the shape.
-- **Gentle scored best here, even though it never reaches pure noise** (60% of the signal is left at t = 100, so sampling starts from the wrong distribution). In 2-D this mismatch is small: x_T has a per-axis variance close to 1 anyway. I do not expect this to carry over to images, and the metric only checks that points are near the roll, not that their density along it matches.
-- **Training length mattered more than expected.** At 8,000 steps the linear schedule gave a visibly blurry roll (sample → data 0.059); 30,000 steps brought it to 0.027. The per-timestep loss was highest at small t, where the noise is hardest to see.
-- The browser MLP matches PyTorch to within 2.2e-6 on the training points at t = 0, 50 and 99, for all three schedules.
+- **Cosine beats linear and aggressive on every shape** (sample → data 0.015 against 0.027 on the swiss roll), and it does reach pure noise.
+- **Gentle still scores as well as cosine**, even though it leaves 60% of the signal at t = 100, so sampling starts from the wrong distribution. In 2-D this mismatch is small: x_T has a per-axis variance close to 1 anyway. I do not expect this to carry over to images. Gentle uses the same β range as the MNIST model, which keeps √ᾱ_T = 0.13 at t = 400.
+- **Aggressive is the blurriest**: its signal is gone by about step 50, so only half the steps carry information about the shape.
+- **All 8 modes were covered in every run** (all schedules and samplers). What changes is how many points fall between modes: within 3σ of a centre are 96% for cosine, 92% for linear and 89% for aggressive with DDPM (real data: 99%).
+- **Training length mattered more than expected.** At 8,000 steps the linear schedule gave a visibly blurry swiss roll (sample → data 0.059); 30,000 steps brought it to 0.027. The per-timestep loss was highest at small t, where the noise is hardest to see.
+
+**DDIM, fewer steps (sample → data):**
+
+| Schedule | Sampler | Swiss roll | Two moons | 8 Gaussians (modes) |
+|---|---|---|---|---|
+| Cosine | DDPM, 100 calls | 0.015 | 0.019 | 0.019 (8/8) |
+| Cosine | DDIM, 20 calls | 0.017 | 0.024 | 0.024 (8/8) |
+| Cosine | DDIM, 10 calls | 0.036 | 0.028 | 0.032 (8/8) |
+| Linear | DDIM, 10 calls | 0.088 | 0.055 | 0.052 (8/8) |
+| Aggressive | DDIM, 10 calls | 0.154 | 0.101 | 0.111 (8/8) |
+
+[![DDPM vs DDIM](results/toy2d_ddim.png)](results/toy2d_ddim.png)
+
+- **DDIM with 20 calls is close to DDPM with 100** for cosine (5× fewer model calls). At 10 calls the shapes are still recognisable, but more points land between the arms and modes.
+- **The schedule matters more with fewer steps.** At 10 calls, linear is 2.4× and aggressive 4.3× worse than cosine on the swiss roll. Their signal drops fast early on, so a 10-step jump at the start skips most of the shape-forming part.
+- **DDIM samples are thinner than the data** (data → sample rises, e.g. 0.011 → 0.019 on the swiss roll with 10 calls): with no fresh noise, points pile up on the middle of each arm or mode.
+- **DDIM needs the x₀ clip with cosine.** At t = 100 the cosine schedule keeps √ᾱ ≈ 5e-4 of the signal, so the first x₀ estimate divides the error in ε by about 2,000. Without clipping x₀ to [-3, 3] the samples blew up (sample → data above 4 in a 300-step test run). All DDIM numbers above use the clip; DDPM does not.
+- **Browser check:** after a full DDIM run (all 12 models, 20 and 10 calls, same starting noise) the largest difference in a final point is 1.6e-3; the browser keeps the schedule in float64, PyTorch in float32.
 
 ### Side Note: Earlier 16x16 Runs on Laptop CPU
 
@@ -694,7 +720,7 @@ diffusion-mnist/
 ├── server2.py                 # Current FastAPI backend
 ├── lab_features.py            # Recognition timeline and sketch to digit
 ├── export_onnx.py             # Export models to ONNX for browser mode
-├── toy2d.py                   # 2D swiss-roll diffusion and 2D playground weights
+├── toy2d.py                   # 2D diffusion (3 shapes, 4 schedules, DDIM) and playground weights
 ├── compare.py                 # EMA vs non-EMA comparison
 ├── compare_ddim.py             # DDPM vs DDIM comparison
 ├── check_setup.py             # Environment and setup checks
