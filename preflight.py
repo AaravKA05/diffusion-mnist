@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent
 FILES = [
+    "checkpoints/cosine_cond_ema.pt",
     "checkpoints/cond_ema.pt",
     "checkpoints/classifier.pt",
     "server2.py",

@@ -6,12 +6,13 @@ import matplotlib.pyplot as plt
 import torch
 from torchvision.utils import make_grid
 
+import config
 from diffusion import T, ddim_sample, device, sample
 from model import UNet
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--ckpt", default="checkpoints/ema.pt")
+    parser.add_argument("--ckpt", default=config.ckpt("ema.pt"))
     parser.add_argument("--tag", default="ema")
     parser.add_argument("--ddim", type=int, default=0,
                         help="number of DDIM steps (0 = normal DDPM sampling)")

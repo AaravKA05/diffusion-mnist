@@ -8,6 +8,7 @@ import torch
 from torchvision.utils import save_image
 
 from data import get_loader
+import config
 from diffusion import device
 from model import UNet
 from sample_cond import cond_ddim_sample
@@ -36,7 +37,7 @@ def nearest(a, b):
 
 
 model = UNet(num_classes=10).to(device)
-model.load_state_dict(torch.load("checkpoints/cond_ema.pt", map_location=device))
+model.load_state_dict(torch.load(config.ckpt("cond_ema.pt"), map_location=device))
 model.eval()
 
 torch.manual_seed(0)
